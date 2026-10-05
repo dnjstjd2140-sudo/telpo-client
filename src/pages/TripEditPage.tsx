@@ -10,7 +10,7 @@ import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/da
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
 import type { LatLng } from '@/types/route'
-import { stopToUpdateRequest } from '@/types/trip'
+import { stopToUpdateRequest, type TripStop } from '@/types/trip'
 
 export function TripEditPage() {
   const { editToken } = useParams<{ editToken: string }>()
@@ -19,6 +19,7 @@ export function TripEditPage() {
   const setTrip = useTripStore((s) => s.setTrip)
   const addStop = useTripStore((s) => s.addStop)
   const removeStop = useTripStore((s) => s.removeStop)
+  const moveStop = useTripStore((s) => s.moveStop)
   const markSaved = useTripStore((s) => s.markSaved)
 
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_MAP_CENTER)
@@ -73,6 +74,13 @@ export function TripEditPage() {
 
   function handleAdd(place: PlaceSearchResult) {
     if (!trip) return
+    // 같은 날짜에 같은 장소를 두 번 추가하면 li의 key(provider:providerPlaceId:dayNo)가 겹쳐서
+    // 순서 변경 시 React가 두 행을 혼동하는 버그가 있었다. 같은 날 중복 추가는 막는다.
+    const alreadyAdded = trip.stops.some(
+      (s) => s.dayNo === selectedDay && s.provider === place.provider && s.providerPlaceId === place.providerPlaceId,
+    )
+    if (alreadyAdded) return
+
     const orderNo = trip.stops.filter((s) => s.dayNo === selectedDay).length
     addStop({
       // 저장 전까지 임시 값. 저장(PUT) 응답으로 실제 placeId가 채워진다.
@@ -88,6 +96,12 @@ export function TripEditPage() {
       memo: null,
       stayMinutes: null,
     })
+  }
+
+  function handleMove(stop: TripStop, direction: -1 | 1) {
+    const currentIndex = dayStops.indexOf(stop)
+    if (currentIndex === -1) return
+    moveStop(stop, currentIndex + direction)
   }
 
   async function handleSave() {
@@ -133,16 +147,37 @@ export function TripEditPage() {
 
         <ul className="trip-stop-list">
           {dayStops.map((stop, i) => (
-            <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${stop.orderNo}`}>
-              <div className="place-info">
-                <strong>
-                  {i + 1}. {stop.name}
-                </strong>
-                {stop.address && <span>{stop.address}</span>}
+            <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}`}>
+              <div className="trip-stop-row">
+                <div className="order-controls">
+                  <span className="order-badge">{i + 1}</span>
+                  <div className="order-buttons">
+                    <button
+                      type="button"
+                      aria-label="위로 이동"
+                      disabled={i === 0}
+                      onClick={() => handleMove(stop, -1)}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="아래로 이동"
+                      disabled={i === dayStops.length - 1}
+                      onClick={() => handleMove(stop, 1)}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+                <div className="place-info">
+                  <strong>{stop.name}</strong>
+                  {stop.address && <span>{stop.address}</span>}
+                </div>
+                <button type="button" onClick={() => removeStop(stop)}>
+                  삭제
+                </button>
               </div>
-              <button type="button" onClick={() => removeStop(stop)}>
-                삭제
-              </button>
             </li>
           ))}
         </ul>

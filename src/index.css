@@ -332,7 +332,7 @@ button {
 }
 
 .place-search-results li,
-.trip-stop-list li {
+.trip-stop-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -361,7 +361,7 @@ button {
 }
 
 .place-search-results button,
-.trip-stop-list button {
+.trip-stop-row button {
   flex-shrink: 0;
   padding: 6px 10px;
   border: 1px solid var(--color-border);
@@ -375,6 +375,53 @@ button {
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid var(--color-border);
+}
+
+/* 순번 배지 + 위/아래 이동 버튼. 숫자를 직접 입력하는 방식은 타이핑 중간값마다
+   onChange가 발생하고 동일한 장소를 두 번 추가했을 때 리스트 key가 겹치면서
+   항목이 뒤섞이는 버그가 있었다 — 한 칸씩 이동하는 버튼으로 바꿔 없앴다. */
+.order-controls {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.order-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.order-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-buttons button {
+  width: 18px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 8px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.order-buttons button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .save-button {
