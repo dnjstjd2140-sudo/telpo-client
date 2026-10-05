@@ -424,6 +424,31 @@ button {
   cursor: default;
 }
 
+/* 두 정류지 사이에 끼워 넣는 이동수단 선택 */
+.travel-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 4px 8px 26px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--color-primary-soft);
+  font-weight: 700;
+}
+
 .save-button {
   width: 100%;
   margin-top: 20px;

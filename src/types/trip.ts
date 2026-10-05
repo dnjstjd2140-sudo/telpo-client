@@ -1,3 +1,5 @@
+import type { TravelMode } from '@/types/route'
+
 export interface TripStop {
   placeId: number
   name: string
@@ -8,6 +10,8 @@ export interface TripStop {
   providerPlaceId: string
   dayNo: number
   orderNo: number
+  /** 이전 정류지에서 이 정류지로 이동할 때의 수단. 그날의 첫 정류지면 의미 없음. */
+  travelMode: TravelMode
   memo: string | null
   stayMinutes: number | null
 }
@@ -44,6 +48,8 @@ export interface UpdateTripStopRequest {
   providerPlaceId: string
   dayNo: number
   orderNo: number
+  /** 이전 정류지에서 여기로 올 때의 이동수단. 그날 첫 정류지면 의미 없음(기본값만 채워짐). */
+  travelMode: TravelMode
   memo: string | null
   stayMinutes: number | null
 }
@@ -72,6 +78,7 @@ export function stopToUpdateRequest(stop: TripStop): UpdateTripStopRequest {
     providerPlaceId: stop.providerPlaceId,
     dayNo: stop.dayNo,
     orderNo: stop.orderNo,
+    travelMode: stop.travelMode,
     memo: stop.memo,
     stayMinutes: stop.stayMinutes,
   }

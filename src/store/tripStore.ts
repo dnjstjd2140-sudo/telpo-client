@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { Trip, TripStop } from '@/types/trip'
+import type { TravelMode } from '@/types/route'
 
 /** dayNo가 같은 stop들의 orderNo를 배열 위치(0부터)로 다시 채운다. */
 function renumber(stops: TripStop[], dayNo: number): TripStop[] {
@@ -17,6 +18,7 @@ interface TripState {
   removeStop: (stop: TripStop) => void
   /** 같은 날짜 안에서 stop을 toIndex(0부터) 위치로 옮기고 orderNo를 다시 매긴다. */
   moveStop: (stop: TripStop, toIndex: number) => void
+  setTravelMode: (stop: TripStop, mode: TravelMode) => void
   markSaved: (trip: Trip) => void
 }
 
@@ -50,5 +52,17 @@ export const useTripStore = create<TripState>((set) => ({
 
       return { trip: { ...state.trip, stops: [...otherStops, ...renumber(reordered, stop.dayNo)] }, isDirty: true }
     }),
+  setTravelMode: (stop, mode) =>
+    set((state) =>
+      state.trip
+        ? {
+            trip: {
+              ...state.trip,
+              stops: state.trip.stops.map((s) => (s === stop ? { ...s, travelMode: mode } : s)),
+            },
+            isDirty: true,
+          }
+        : state,
+    ),
   markSaved: (trip) => set({ trip, isDirty: false }),
 }))

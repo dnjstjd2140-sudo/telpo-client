@@ -12,9 +12,15 @@ export interface MapMarker {
   order?: number
 }
 
+export interface RouteSegment {
+  path: LatLng[]
+  color: string
+}
+
 export interface MapViewProps {
   markers: MapMarker[]
-  route?: LatLng[]
+  /** 구간별로 다른 색으로 그릴 경로선들 (이동수단에 따라 색이 달라짐) */
+  routeSegments?: RouteSegment[]
   center?: LatLng
   className?: string
   /** 지도 이동/줌이 끝날 때마다 중심 좌표를 알려준다 (장소 검색 기준점 등에 사용) */
@@ -25,12 +31,12 @@ export interface MapViewProps {
  * 카카오맵 SDK 호출은 이 컴포넌트 내부로 한정한다.
  * country_code에 따라 provider를 바꾸게 되면(3단계) 이 컴포넌트만 교체/분기한다.
  */
-export function MapView({ markers, route, center, className, onCenterChanged }: MapViewProps) {
+export function MapView({ markers, routeSegments, center, className, onCenterChanged }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<kakao.maps.Map | null>(null)
   const markerObjsRef = useRef<kakao.maps.Marker[]>([])
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([])
-  const polylineRef = useRef<kakao.maps.Polyline | null>(null)
+  const polylinesRef = useRef<kakao.maps.Polyline[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -98,22 +104,25 @@ export function MapView({ markers, route, center, className, onCenterChanged }: 
     prevMarkerCountRef.current = markers.length
   }, [markers])
 
-  // 경로선 갱신
+  // 경로선 갱신 (구간마다 다른 색)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    polylineRef.current?.setMap(null)
-    if (!route || route.length < 2) return
-
-    polylineRef.current = new window.kakao.maps.Polyline({
-      path: route.map((p) => new window.kakao.maps.LatLng(p.lat, p.lng)),
-      strokeWeight: 4,
-      strokeColor: '#7c3aed',
-      strokeOpacity: 0.9,
-    })
-    polylineRef.current.setMap(map)
-  }, [route])
+    polylinesRef.current.forEach((line) => line.setMap(null))
+    polylinesRef.current = (routeSegments ?? [])
+      .filter((segment) => segment.path.length >= 2)
+      .map((segment) => {
+        const line = new window.kakao.maps.Polyline({
+          path: segment.path.map((p) => new window.kakao.maps.LatLng(p.lat, p.lng)),
+          strokeWeight: 4,
+          strokeColor: segment.color,
+          strokeOpacity: 0.9,
+        })
+        line.setMap(map)
+        return line
+      })
+  }, [routeSegments])
 
   if (error) {
     return <div className={className}>지도를 불러오지 못했습니다: {error}</div>

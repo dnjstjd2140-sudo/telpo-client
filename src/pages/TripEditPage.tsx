@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom'
 
 import { getTripByEditToken, saveTrip } from '@/api/trips'
 import { getRoute } from '@/api/routes'
-import { MapView } from '@/components/map/MapView'
+import { MapView, type RouteSegment } from '@/components/map/MapView'
 import { PlaceSearch } from '@/components/PlaceSearch'
-import { DEFAULT_MAP_CENTER } from '@/lib/constants'
+import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
@@ -20,12 +20,13 @@ export function TripEditPage() {
   const addStop = useTripStore((s) => s.addStop)
   const removeStop = useTripStore((s) => s.removeStop)
   const moveStop = useTripStore((s) => s.moveStop)
+  const setTravelMode = useTripStore((s) => s.setTravelMode)
   const markSaved = useTripStore((s) => s.markSaved)
 
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_MAP_CENTER)
   const [isSaving, setIsSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState(1)
-  const [routePath, setRoutePath] = useState<LatLng[] | null>(null)
+  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([])
 
   useEffect(() => {
     if (!editToken) return
@@ -42,20 +43,31 @@ export function TripEditPage() {
     trip
       ?.stops.filter((s) => s.dayNo === selectedDay)
       .sort((a, b) => a.orderNo - b.orderNo) ?? []
-  const routeKey = dayStops.map((s) => `${s.lat},${s.lng}`).join('|')
+  const routeKey = dayStops.map((s) => `${s.lat},${s.lng},${s.travelMode}`).join('|')
 
+  // 구간(이전 정류지 -> 이 정류지)별로 선택된 이동수단에 맞춰 경로를 따로 불러오고, 수단마다 다른 색으로 그린다.
   useEffect(() => {
     if (dayStops.length < 2) {
-      setRoutePath(null)
+      setRouteSegments([])
       return
     }
     let cancelled = false
-    getRoute({ waypoints: dayStops.map((s) => ({ lat: s.lat, lng: s.lng })), mode: 'CAR' })
-      .then((res) => {
-        if (!cancelled) setRoutePath(res.path)
+    Promise.all(
+      dayStops.slice(1).map((stop, i) =>
+        getRoute({
+          waypoints: [
+            { lat: dayStops[i].lat, lng: dayStops[i].lng },
+            { lat: stop.lat, lng: stop.lng },
+          ],
+          mode: stop.travelMode,
+        }).then((res) => ({ path: res.path, color: TRAVEL_MODE_COLOR[stop.travelMode] })),
+      ),
+    )
+      .then((segments) => {
+        if (!cancelled) setRouteSegments(segments)
       })
       .catch(() => {
-        if (!cancelled) setRoutePath(null)
+        if (!cancelled) setRouteSegments([])
       })
     return () => {
       cancelled = true
@@ -93,6 +105,7 @@ export function TripEditPage() {
       providerPlaceId: place.providerPlaceId,
       dayNo: selectedDay,
       orderNo,
+      travelMode: 'CAR',
       memo: null,
       stayMinutes: null,
     })
@@ -148,6 +161,21 @@ export function TripEditPage() {
         <ul className="trip-stop-list">
           {dayStops.map((stop, i) => (
             <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}`}>
+              {i > 0 && (
+                <div className="travel-mode-row">
+                  {TRAVEL_MODES.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={stop.travelMode === mode ? 'mode-btn active' : 'mode-btn'}
+                      style={stop.travelMode === mode ? { borderColor: TRAVEL_MODE_COLOR[mode], color: TRAVEL_MODE_COLOR[mode] } : undefined}
+                      onClick={() => setTravelMode(stop, mode)}
+                    >
+                      {TRAVEL_MODE_LABEL[mode]}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="trip-stop-row">
                 <div className="order-controls">
                   <span className="order-badge">{i + 1}</span>
@@ -189,7 +217,7 @@ export function TripEditPage() {
       <main className="trip-map">
         <MapView
           markers={markers}
-          route={routePath ?? undefined}
+          routeSegments={routeSegments}
           center={mapCenter}
           onCenterChanged={setMapCenter}
           className="map-view"
