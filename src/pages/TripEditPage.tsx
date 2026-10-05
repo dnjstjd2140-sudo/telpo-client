@@ -157,62 +157,6 @@ export function TripEditPage() {
         </div>
 
         <PlaceSearch center={mapCenter} onAdd={handleAdd} />
-
-        <ul className="trip-stop-list">
-          {dayStops.map((stop, i) => (
-            <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}`}>
-              {i > 0 && (
-                <div className="travel-mode-row">
-                  {TRAVEL_MODES.map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={stop.travelMode === mode ? 'mode-btn active' : 'mode-btn'}
-                      style={stop.travelMode === mode ? { borderColor: TRAVEL_MODE_COLOR[mode], color: TRAVEL_MODE_COLOR[mode] } : undefined}
-                      onClick={() => setTravelMode(stop, mode)}
-                    >
-                      {TRAVEL_MODE_LABEL[mode]}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="trip-stop-row">
-                <div className="order-controls">
-                  <span className="order-badge">{i + 1}</span>
-                  <div className="order-buttons">
-                    <button
-                      type="button"
-                      aria-label="위로 이동"
-                      disabled={i === 0}
-                      onClick={() => handleMove(stop, -1)}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="아래로 이동"
-                      disabled={i === dayStops.length - 1}
-                      onClick={() => handleMove(stop, 1)}
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-                <div className="place-info">
-                  <strong>{stop.name}</strong>
-                  {stop.address && <span>{stop.address}</span>}
-                </div>
-                <button type="button" onClick={() => removeStop(stop)}>
-                  삭제
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        <button type="button" className="save-button" onClick={handleSave} disabled={isSaving || !isDirty}>
-          {isSaving ? '저장 중...' : '저장'}
-        </button>
       </aside>
       <main className="trip-map">
         <MapView
@@ -222,6 +166,67 @@ export function TripEditPage() {
           onCenterChanged={setMapCenter}
           className="map-view"
         />
+
+        {dayStops.length > 0 && (
+          <div className="map-overlay-panel">
+            <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
+            <ul className="trip-stop-list">
+              {dayStops.map((stop, i) => (
+                <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}`}>
+                  {i > 0 && (
+                    <div className="travel-mode-row">
+                      {TRAVEL_MODES.map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={stop.travelMode === mode ? 'mode-btn active' : 'mode-btn'}
+                          style={stop.travelMode === mode ? { borderColor: TRAVEL_MODE_COLOR[mode], color: TRAVEL_MODE_COLOR[mode] } : undefined}
+                          onClick={() => setTravelMode(stop, mode)}
+                        >
+                          {TRAVEL_MODE_LABEL[mode]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="trip-stop-row">
+                    <div className="order-controls">
+                      <span className="order-badge">{i + 1}</span>
+                      <div className="order-buttons">
+                        <button
+                          type="button"
+                          aria-label="위로 이동"
+                          disabled={i === 0}
+                          onClick={() => handleMove(stop, -1)}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="아래로 이동"
+                          disabled={i === dayStops.length - 1}
+                          onClick={() => handleMove(stop, 1)}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                    <div className="place-info">
+                      <strong>{stop.name}</strong>
+                      {stop.address && <span>{stop.address}</span>}
+                    </div>
+                    <button type="button" onClick={() => removeStop(stop)}>
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <button type="button" className="save-button" onClick={handleSave} disabled={isSaving || !isDirty}>
+              {isSaving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        )}
       </main>
     </div>
   )
