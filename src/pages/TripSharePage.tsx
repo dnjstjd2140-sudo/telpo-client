@@ -12,24 +12,34 @@ export function TripSharePage() {
 
   useEffect(() => {
     if (!shareToken) return
-    getTripByShareToken(shareToken).then((t) => setTrip(t, { isReadOnly: true }))
+    getTripByShareToken(shareToken).then((t) => setTrip(t))
   }, [shareToken, setTrip])
 
   if (!trip) return <div>불러오는 중...</div>
 
-  const markers = trip.stops.map((stop) => ({
-    id: stop.id,
-    position: { lat: stop.place.lat, lng: stop.place.lng },
-    label: stop.place.name,
+  const markers = trip.stops.map((stop, i) => ({
+    id: i,
+    position: { lat: stop.lat, lng: stop.lng },
+    label: stop.name,
   }))
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      <aside style={{ width: 360, overflowY: 'auto' }}>
+    <div className="trip-layout">
+      <aside className="trip-sidebar">
         <h1>{trip.title}</h1>
-        <p>읽기 전용 보기</p>
+        <p className="subtitle">읽기 전용 보기</p>
+        <ul className="trip-stop-list">
+          {trip.stops.map((stop, i) => (
+            <li key={`${stop.provider}:${stop.providerPlaceId}:${i}`}>
+              <div className="place-info">
+                <strong>{stop.name}</strong>
+                {stop.address && <span>{stop.address}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
       </aside>
-      <main style={{ flex: 1 }}>
+      <main className="trip-map">
         <MapView markers={markers} className="map-view" />
       </main>
     </div>
