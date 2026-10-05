@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { getTripByEditToken, saveTrip } from '@/api/trips'
@@ -7,9 +7,10 @@ import { MapView, type RouteSegment } from '@/components/map/MapView'
 import { PlaceSearch } from '@/components/PlaceSearch'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
+import { formatDuration, formatDistance } from '@/lib/format'
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
-import type { LatLng } from '@/types/route'
+import type { LatLng, RouteResponse } from '@/types/route'
 import { stopToUpdateRequest, type TripStop } from '@/types/trip'
 
 export function TripEditPage() {
@@ -27,6 +28,11 @@ export function TripEditPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState(1)
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([])
+  // dayStops[i]로 오는 구간의 소요시간/거리. 첫 정류지(index 0)는 이전 구간이 없어 항상 undefined.
+  const [segmentInfo, setSegmentInfo] = useState<Record<number, { durationSeconds: number; distanceMeters: number }>>({})
+  // (출발좌표->도착좌표:수단) 단위 클라이언트 캐시. 같은 두 지점 사이를 같은 수단으로 다시 보면
+  // 서버에 또 요청하지 않고 바로 재사용한다 (자차<->도보 왔다갔다 토글해도 이미 본 조합은 재요청 없음).
+  const routeCacheRef = useRef(new Map<string, RouteResponse>())
 
   useEffect(() => {
     if (!editToken) return
@@ -46,28 +52,54 @@ export function TripEditPage() {
   const routeKey = dayStops.map((s) => `${s.lat},${s.lng},${s.travelMode}`).join('|')
 
   // 구간(이전 정류지 -> 이 정류지)별로 선택된 이동수단에 맞춰 경로를 따로 불러오고, 수단마다 다른 색으로 그린다.
+  // 서버 응답의 durationSeconds/distanceMeters도 같이 받아서 각 구간 줄에 표시한다.
   useEffect(() => {
     if (dayStops.length < 2) {
       setRouteSegments([])
+      setSegmentInfo({})
       return
     }
     let cancelled = false
     Promise.all(
-      dayStops.slice(1).map((stop, i) =>
-        getRoute({
-          waypoints: [
-            { lat: dayStops[i].lat, lng: dayStops[i].lng },
-            { lat: stop.lat, lng: stop.lng },
-          ],
-          mode: stop.travelMode,
-        }).then((res) => ({ path: res.path, color: TRAVEL_MODE_COLOR[stop.travelMode] })),
-      ),
+      dayStops.slice(1).map((stop, i) => {
+        const from = dayStops[i]
+        const cacheKey = `${from.lat},${from.lng}->${stop.lat},${stop.lng}:${stop.travelMode}`
+        const cached = routeCacheRef.current.get(cacheKey)
+        const result = cached
+          ? Promise.resolve(cached)
+          : getRoute({
+              waypoints: [
+                { lat: from.lat, lng: from.lng },
+                { lat: stop.lat, lng: stop.lng },
+              ],
+              mode: stop.travelMode,
+            }).then((res) => {
+              routeCacheRef.current.set(cacheKey, res)
+              return res
+            })
+
+        return result.then((res) => ({
+          path: res.path,
+          color: TRAVEL_MODE_COLOR[stop.travelMode],
+          durationSeconds: res.durationSeconds,
+          distanceMeters: res.distanceMeters,
+        }))
+      }),
     )
-      .then((segments) => {
-        if (!cancelled) setRouteSegments(segments)
+      .then((results) => {
+        if (cancelled) return
+        setRouteSegments(results.map(({ path, color }) => ({ path, color })))
+        setSegmentInfo(
+          Object.fromEntries(
+            results.map(({ durationSeconds, distanceMeters }, i) => [i + 1, { durationSeconds, distanceMeters }]),
+          ),
+        )
       })
       .catch(() => {
-        if (!cancelled) setRouteSegments([])
+        if (!cancelled) {
+          setRouteSegments([])
+          setSegmentInfo({})
+        }
       })
     return () => {
       cancelled = true
@@ -186,6 +218,11 @@ export function TripEditPage() {
                           {TRAVEL_MODE_LABEL[mode]}
                         </button>
                       ))}
+                      <span className="travel-mode-info">
+                        {segmentInfo[i]
+                          ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
+                          : '계산 중...'}
+                      </span>
                     </div>
                   )}
                   <div className="trip-stop-row">

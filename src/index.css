@@ -479,6 +479,14 @@ button {
   font-weight: 700;
 }
 
+/* 선택된 수단으로 이동 시 예상 소요시간/거리 (서버 Tmap 응답의 durationSeconds/distanceMeters) */
+.travel-mode-info {
+  flex-basis: 100%;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .save-button {
   width: 100%;
   margin-top: 20px;
