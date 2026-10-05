@@ -1,6 +1,30 @@
 :root {
   color-scheme: light dark;
   font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-border: #e3e4e8;
+  --color-text: #1b1c20;
+  --color-text-muted: #6b6d76;
+  --color-primary: #7c3aed;
+  --color-primary-text: #ffffff;
+  --color-primary-soft: #ede9fe;
+  --shadow-card: 0 20px 40px -12px rgba(124, 58, 237, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #15131c;
+    --color-surface: #1e1a29;
+    --color-border: #332d47;
+    --color-text: #f2f2f5;
+    --color-text-muted: #a5a0b8;
+    --color-primary: #a78bfa;
+    --color-primary-text: #1a1330;
+    --color-primary-soft: rgba(167, 139, 250, 0.16);
+    --shadow-card: 0 20px 40px -12px rgba(0, 0, 0, 0.55);
+  }
 }
 
 * {
@@ -14,7 +38,183 @@ body,
   margin: 0;
 }
 
-.map-view {
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+button {
+  font: inherit;
+}
+
+/* ---- Home ---- */
+
+.home-hero {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-primary) 30%, var(--color-border)) 1px, transparent 0),
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent 55%),
+    radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--color-primary) 22%, transparent), transparent 55%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+}
+
+.home-card {
   width: 100%;
-  height: 100%;
+  max-width: 420px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  padding: 32px;
+}
+
+.home-card h1.brand {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-primary);
+}
+
+.home-card .tagline {
+  margin: 6px 0 28px;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+.home-form-full {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-form-full .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.home-form-full input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-range input {
+  flex: 1;
+  min-width: 0;
+}
+
+.date-range-sep {
+  color: var(--color-text-muted);
+}
+
+.duration-badge {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.home-form-full button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.home-form-full button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.home-form {
+  display: flex;
+  gap: 8px;
+}
+
+.home-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.home-form button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.home-trip-list {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.home-trip-list h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.home-trip-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-trip-list a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.home-trip-list a:hover {
+  background: var(--color-bg);
 }
