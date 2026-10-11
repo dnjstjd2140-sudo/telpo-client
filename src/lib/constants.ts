@@ -9,7 +9,7 @@ export const TRAVEL_MODE_LABEL: Record<TravelMode, string> = {
 }
 
 export const TRAVEL_MODE_COLOR: Record<TravelMode, string> = {
-  CAR: '#7c3aed',
+  CAR: '#ef4444',
   WALK: '#16a34a',
   TRANSIT: '#2563eb',
 }
