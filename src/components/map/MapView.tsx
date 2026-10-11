@@ -61,6 +61,12 @@ export interface MapViewProps {
   highlightedSegment?: number | null
   /** 지도 위 경로선에 마우스를 올리거나 뗄 때 해당 구간 index(없으면 null)를 알려준다. */
   onSegmentHover?: (index: number | null) => void
+  /** 마커(또는 순번 뱃지)를 눌렀을 때 markers 배열 기준 index를 알려준다. */
+  onMarkerClick?: (index: number) => void
+  /** 선택된 마커의 index. 해당 순번 뱃지를 크게/진하게 강조한다. */
+  selectedMarker?: number | null
+  /** 값이 새로 들어올 때마다 지도를 그 좌표로 부드럽게 이동한다 (객체가 바뀌면 같은 좌표여도 이동). */
+  panTo?: LatLng | null
   center?: LatLng
   className?: string
   /** 지도 이동/줌이 끝날 때마다 중심 좌표를 알려준다 (장소 검색 기준점 등에 사용) */
@@ -71,7 +77,7 @@ export interface MapViewProps {
  * 카카오맵 SDK 호출은 이 컴포넌트 내부로 한정한다.
  * country_code에 따라 provider를 바꾸게 되면(3단계) 이 컴포넌트만 교체/분기한다.
  */
-export function MapView({ markers, routeSegments, highlightedSegment, onSegmentHover, center, className, onCenterChanged }: MapViewProps) {
+export function MapView({ markers, routeSegments, highlightedSegment, onSegmentHover, onMarkerClick, selectedMarker, panTo, center, className, onCenterChanged }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<kakao.maps.Map | null>(null)
   const markerObjsRef = useRef<kakao.maps.Marker[]>([])
@@ -82,6 +88,8 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
   const highlightRef = useRef<number | null>(null)
   const onSegmentHoverRef = useRef(onSegmentHover)
   onSegmentHoverRef.current = onSegmentHover
+  const onMarkerClickRef = useRef(onMarkerClick)
+  onMarkerClickRef.current = onMarkerClick
   const [error, setError] = useState<string | null>(null)
   const [zoomLevel, setZoomLevel] = useState(7)
 
@@ -114,6 +122,15 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 사이드바/패널을 접고 펴서 지도 영역 크기가 바뀌면 카카오맵에 다시 레이아웃하라고 알려준다
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => mapRef.current?.relayout())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
   // 마커 갱신 (마커가 늘어나면 새로 추가된 위치로 이동)
   const prevMarkerCountRef = useRef(0)
   useEffect(() => {
@@ -123,22 +140,29 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
     markerObjsRef.current.forEach((marker) => marker.setMap(null))
     overlaysRef.current.forEach((overlay) => overlay.setMap(null))
 
-    markerObjsRef.current = markers.map(({ position, label }) => {
+    markerObjsRef.current = markers.map(({ position, label }, index) => {
       const marker = new window.kakao.maps.Marker({
         position: new window.kakao.maps.LatLng(position.lat, position.lng),
         title: label,
       })
+      window.kakao.maps.event.addListener(marker, 'click', () => onMarkerClickRef.current?.(index))
       marker.setMap(map)
       return marker
     })
 
     overlaysRef.current = markers
+      .map((m, index) => ({ ...m, index }))
       .filter((m) => m.order != null)
-      .map(({ position, order }) => {
+      .map(({ position, order, index }) => {
+        const badge = document.createElement('div')
+        badge.className = index === selectedMarker ? 'map-marker-badge selected' : 'map-marker-badge'
+        badge.textContent = String(order)
+        badge.addEventListener('click', () => onMarkerClickRef.current?.(index))
         const overlay = new window.kakao.maps.CustomOverlay({
           position: new window.kakao.maps.LatLng(position.lat, position.lng),
-          content: `<div class="map-marker-badge">${order}</div>`,
+          content: badge,
           yAnchor: 2.4,
+          zIndex: index === selectedMarker ? 20 : 3,
         })
         overlay.setMap(map)
         return overlay
@@ -149,7 +173,14 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
       map.panTo(new window.kakao.maps.LatLng(last.lat, last.lng))
     }
     prevMarkerCountRef.current = markers.length
-  }, [markers])
+  }, [markers, selectedMarker])
+
+  // 외부(일정 목록)에서 요청한 좌표로 지도를 이동한다
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !panTo) return
+    map.panTo(new window.kakao.maps.LatLng(panTo.lat, panTo.lng))
+  }, [panTo])
 
   // 경로선 갱신 (구간마다 다른 색)
   useEffect(() => {
