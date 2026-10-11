@@ -242,17 +242,56 @@ button {
 /* ---- Trip layout (edit / share) ---- */
 
 .trip-layout {
+  position: relative;
   display: flex;
   height: 100%;
 }
 
 .trip-sidebar {
-  width: 360px;
-  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   overflow-y: auto;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: 20px;
+}
+
+/* 좌측 검색 패널은 지도 위에 겹쳐 뜬다. 접고 펴도 지도 크기/위치는 그대로다. */
+.trip-sidebar-wrap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 12;
+  width: 360px;
+  transition: transform 0.2s ease;
+}
+
+.trip-sidebar-wrap.collapsed {
+  transform: translateX(-360px);
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 16px;
+  left: 100%;
+  width: 24px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  box-shadow: 4px 2px 10px -4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.trip-panel-actions {
+  display: flex;
+  gap: 4px;
 }
 
 .trip-sidebar h1 {
@@ -344,6 +383,57 @@ button {
   font-size: 13px;
 }
 
+.trip-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trip-panel-header .trip-panel-title {
+  margin: 0;
+}
+
+.summary-toggle {
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.summary-toggle[aria-expanded='true'] {
+  border-color: var(--color-primary, #7c3aed);
+  color: var(--color-primary, #7c3aed);
+}
+
+.memo-toggle {
+  margin: 2px 0 0 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.stop-memo {
+  box-sizing: border-box;
+  width: calc(100% - 26px);
+  margin: 4px 0 0 26px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
 .trip-panel-title {
   margin: 0 0 8px;
   font-size: 13px;
@@ -370,6 +460,25 @@ button {
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--color-bg);
+}
+
+.trip-stop-row {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.trip-stop-row.selected {
+  border-color: var(--color-primary, #7c3aed);
+  background: var(--color-primary-soft);
+}
+
+.map-marker-badge {
+  cursor: pointer;
+}
+
+.map-marker-badge.selected {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .place-info {
@@ -415,6 +524,32 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.order-input {
+  box-sizing: border-box;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  cursor: text;
+}
+
+.order-input:hover {
+  border-color: var(--color-primary);
+}
+
+.order-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-surface);
 }
 
 .order-badge {

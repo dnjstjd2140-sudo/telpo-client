@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom'
 import { getTripByEditToken, saveTrip } from '@/api/trips'
 import { getRoute } from '@/api/routes'
 import { MapView, type RouteSegment } from '@/components/map/MapView'
+import { OrderInput } from '@/components/OrderInput'
 import { PlaceSearch } from '@/components/PlaceSearch'
 import { RouteDetail } from '@/components/RouteDetail'
+import { StopMemo } from '@/components/StopMemo'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { formatDuration, formatDistance } from '@/lib/format'
@@ -23,12 +25,20 @@ export function TripEditPage() {
   const removeStop = useTripStore((s) => s.removeStop)
   const moveStop = useTripStore((s) => s.moveStop)
   const setTravelMode = useTripStore((s) => s.setTravelMode)
+  const setMemo = useTripStore((s) => s.setMemo)
   const markSaved = useTripStore((s) => s.markSaved)
 
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_MAP_CENTER)
   const [isSaving, setIsSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState(1)
   // 일정 목록의 이동 구간이나 지도 위 경로선에 마우스를 올리면 양쪽 모두에서 그 구간을 강조한다.
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(true)
+  // 선택된 정류지(dayStops 기준 index). 마커를 누르거나 목록 행을 누르면 바뀌고, 둘 다에 강조 표시된다.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  // 목록 행을 눌렀을 때 지도를 그 마커로 옮기기 위한 요청 (새 객체를 넣을 때마다 이동)
+  const [panTarget, setPanTarget] = useState<LatLng | null>(null)
+  const stopItemRefs = useRef<(HTMLLIElement | null)[]>([])
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([])
   // dayStops[i]로 오는 구간의 소요시간/거리. 첫 정류지(index 0)는 이전 구간이 없어 항상 undefined.
@@ -154,10 +164,28 @@ export function TripEditPage() {
     })
   }
 
+  useEffect(() => {
+    if (selectedIndex == null) return
+    stopItemRefs.current[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedIndex])
+
   function handleMove(stop: TripStop, direction: -1 | 1) {
     const currentIndex = dayStops.indexOf(stop)
     if (currentIndex === -1) return
     moveStop(stop, currentIndex + direction)
+    setSelectedIndex(currentIndex + direction)
+  }
+
+  function handleReorder(stop: TripStop, toIndex: number) {
+    moveStop(stop, toIndex)
+    setSelectedIndex(toIndex)
+  }
+
+  function handleSelectStop(stop: TripStop, index: number, target: EventTarget) {
+    // 행 안의 버튼/입력칸을 누른 경우는 선택·이동을 하지 않는다
+    if ((target as HTMLElement).closest('button, input, textarea')) return
+    setSelectedIndex(index)
+    setPanTarget({ lat: stop.lat, lng: stop.lng })
   }
 
   async function handleSave() {
@@ -178,6 +206,7 @@ export function TripEditPage() {
 
   return (
     <div className="trip-layout">
+      <div className={sidebarOpen ? 'trip-sidebar-wrap' : 'trip-sidebar-wrap collapsed'}>
       <aside className="trip-sidebar">
         <h1>{trip.title}</h1>
         <p className="subtitle">
@@ -191,7 +220,10 @@ export function TripEditPage() {
               key={day}
               type="button"
               className={day === selectedDay ? 'day-tab active' : 'day-tab'}
-              onClick={() => setSelectedDay(day)}
+              onClick={() => {
+                setSelectedDay(day)
+                setSelectedIndex(null)
+              }}
             >
               <span>Day {day}</span>
               {trip.startDate && <span className="day-tab-date">{formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
@@ -201,12 +233,25 @@ export function TripEditPage() {
 
         <PlaceSearch center={mapCenter} onAdd={handleAdd} />
       </aside>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          aria-expanded={sidebarOpen}
+          aria-label={sidebarOpen ? '검색 패널 접기' : '검색 패널 펼치기'}
+          onClick={() => setSidebarOpen((open) => !open)}
+        >
+          {sidebarOpen ? '◀' : '▶'}
+        </button>
+      </div>
       <main className="trip-map">
         <MapView
           markers={markers}
           routeSegments={routeSegments}
           highlightedSegment={hoveredSegment}
           onSegmentHover={setHoveredSegment}
+          onMarkerClick={setSelectedIndex}
+          selectedMarker={selectedIndex}
+          panTo={panTarget}
           center={mapCenter}
           onCenterChanged={setMapCenter}
           className="map-view"
@@ -214,10 +259,30 @@ export function TripEditPage() {
 
         {dayStops.length > 0 && (
           <div className="map-overlay-panel">
-            <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
+            <div className="trip-panel-header">
+              <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
+              <div className="trip-panel-actions">
+                <button
+                  type="button"
+                  className="summary-toggle"
+                  aria-expanded={panelOpen}
+                  aria-label={panelOpen ? '일정 패널 접기' : '일정 패널 펼치기'}
+                  onClick={() => setPanelOpen((open) => !open)}
+                >
+                  {panelOpen ? '접기 ▴' : '펼치기 ▾'}
+                </button>
+              </div>
+            </div>
+            {panelOpen && (
+              <>
             <ul className="trip-stop-list">
               {dayStops.map((stop, i) => (
-                <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${visitIndex(i)}`}>
+                <li
+                  key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${visitIndex(i)}`}
+                  ref={(el) => {
+                    stopItemRefs.current[i] = el
+                  }}
+                >
                   {i > 0 && (
                     <div
                       className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
@@ -243,9 +308,12 @@ export function TripEditPage() {
                       {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
                     </div>
                   )}
-                  <div className="trip-stop-row">
+                  <div
+                    className={selectedIndex === i ? 'trip-stop-row selected' : 'trip-stop-row'}
+                    onClick={(e) => handleSelectStop(stop, i, e.target)}
+                  >
                     <div className="order-controls">
-                      <span className="order-badge">{i + 1}</span>
+                      <OrderInput value={i + 1} max={dayStops.length} onCommit={(to) => handleReorder(stop, to)} />
                       <div className="order-buttons">
                         <button
                           type="button"
@@ -269,10 +337,17 @@ export function TripEditPage() {
                       <strong>{stop.name}</strong>
                       {stop.address && <span>{stop.address}</span>}
                     </div>
-                    <button type="button" onClick={() => removeStop(stop)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        removeStop(stop)
+                        setSelectedIndex(null)
+                      }}
+                    >
                       삭제
                     </button>
                   </div>
+                  <StopMemo memo={stop.memo} onChange={(memo) => setMemo(stop, memo)} />
                 </li>
               ))}
             </ul>
@@ -280,6 +355,8 @@ export function TripEditPage() {
             <button type="button" className="save-button" onClick={handleSave} disabled={isSaving || !isDirty}>
               {isSaving ? '저장 중...' : '저장'}
             </button>
+              </>
+            )}
           </div>
         )}
       </main>
