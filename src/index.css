@@ -460,6 +460,11 @@ button {
   flex-wrap: wrap;
   gap: 4px;
   padding: 4px 4px 8px 26px;
+  border-radius: 6px;
+}
+
+.travel-mode-row.hovered {
+  background: rgba(124, 58, 237, 0.04);
 }
 
 .mode-btn {
@@ -485,6 +490,46 @@ button {
   margin-top: 2px;
   font-size: 11px;
   color: var(--color-text-muted);
+}
+
+.route-detail {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.transit-legs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.transit-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-primary, #7c3aed);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.transit-leg small {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.transit-leg.walk {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
 }
 
 .save-button {

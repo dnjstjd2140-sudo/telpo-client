@@ -11,10 +11,33 @@ export interface RouteRequest {
   mode: TravelMode
 }
 
+/** 대중교통 경로의 한 구간. mode는 Tmap 값 그대로 (WALK, BUS, SUBWAY, EXPRESSBUS, TRAIN ...). */
+export interface TransitLeg {
+  mode: string
+  /** 노선명 (예: "수도권2호선", "간선:146"). 도보 구간은 빈 문자열 */
+  name: string
+  /** 노선 색 (예: "33A5FF", '#' 없음). 없으면 빈 문자열 */
+  color: string
+  startName: string
+  endName: string
+  durationSeconds: number
+  /** RouteResponse.path 안에서 이 구간이 차지하는 좌표 index 범위 (시작·끝 포함) */
+  pathStart: number
+  pathEnd: number
+}
+
 export interface RouteResponse {
   path: LatLng[]
   distanceMeters: number
   durationSeconds: number
+  /** 자차: 택시 예상 요금(원) */
+  taxiFare: number | null
+  /** 자차: 통행료(원) */
+  tollFare: number | null
+  /** 대중교통: 총 요금(원) */
+  transitFare: number | null
+  /** 대중교통: 도보/버스/지하철 구간 */
+  legs: TransitLeg[]
 }
 
 export interface OptimizeRequest {

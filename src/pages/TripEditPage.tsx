@@ -5,6 +5,7 @@ import { getTripByEditToken, saveTrip } from '@/api/trips'
 import { getRoute } from '@/api/routes'
 import { MapView, type RouteSegment } from '@/components/map/MapView'
 import { PlaceSearch } from '@/components/PlaceSearch'
+import { RouteDetail } from '@/components/RouteDetail'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { formatDuration, formatDistance } from '@/lib/format'
@@ -27,9 +28,11 @@ export function TripEditPage() {
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_MAP_CENTER)
   const [isSaving, setIsSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState(1)
+  // 일정 목록의 이동 구간이나 지도 위 경로선에 마우스를 올리면 양쪽 모두에서 그 구간을 강조한다.
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([])
   // dayStops[i]로 오는 구간의 소요시간/거리. 첫 정류지(index 0)는 이전 구간이 없어 항상 undefined.
-  const [segmentInfo, setSegmentInfo] = useState<Record<number, { durationSeconds: number; distanceMeters: number }>>({})
+  const [segmentInfo, setSegmentInfo] = useState<Record<number, RouteResponse>>({})
   // (출발좌표->도착좌표:수단) 단위 클라이언트 캐시. 같은 두 지점 사이를 같은 수단으로 다시 보면
   // 서버에 또 요청하지 않고 바로 재사용한다 (자차<->도보 왔다갔다 토글해도 이미 본 조합은 재요청 없음).
   const routeCacheRef = useRef(new Map<string, RouteResponse>())
@@ -81,17 +84,21 @@ export function TripEditPage() {
         return result.then((res) => ({
           path: res.path,
           color: TRAVEL_MODE_COLOR[stop.travelMode],
-          durationSeconds: res.durationSeconds,
-          distanceMeters: res.distanceMeters,
+          dashed: stop.travelMode === 'WALK',
+          // 대중교통은 환승 사이의 도보 구간만 점선으로 그린다
+          dashedRanges: res.legs
+            .filter((leg) => leg.mode === 'WALK' && leg.pathEnd > leg.pathStart)
+            .map((leg): [number, number] => [leg.pathStart, leg.pathEnd]),
+          route: res,
         }))
       }),
     )
       .then((results) => {
         if (cancelled) return
-        setRouteSegments(results.map(({ path, color }) => ({ path, color })))
+        setRouteSegments(results.map(({ path, color, dashed, dashedRanges }) => ({ path, color, dashed, dashedRanges })))
         setSegmentInfo(
           Object.fromEntries(
-            results.map(({ durationSeconds, distanceMeters }, i) => [i + 1, { durationSeconds, distanceMeters }]),
+            results.map(({ route }, i) => [i + 1, route]),
           ),
         )
       })
@@ -116,14 +123,18 @@ export function TripEditPage() {
     order: i + 1,
   }))
 
+  /** 같은 장소가 여러 번 나올 때 li key가 겹치지 않도록, 그 장소의 몇 번째 방문인지 센다. */
+  function visitIndex(i: number) {
+    const { provider, providerPlaceId } = dayStops[i]
+    return dayStops.slice(0, i).filter((s) => s.provider === provider && s.providerPlaceId === providerPlaceId).length
+  }
+
   function handleAdd(place: PlaceSearchResult) {
     if (!trip) return
-    // 같은 날짜에 같은 장소를 두 번 추가하면 li의 key(provider:providerPlaceId:dayNo)가 겹쳐서
-    // 순서 변경 시 React가 두 행을 혼동하는 버그가 있었다. 같은 날 중복 추가는 막는다.
-    const alreadyAdded = trip.stops.some(
-      (s) => s.dayNo === selectedDay && s.provider === place.provider && s.providerPlaceId === place.providerPlaceId,
-    )
-    if (alreadyAdded) return
+    // A→B→A처럼 나중에 같은 장소로 돌아오는 건 허용하되, 바로 직전 정류지와 같은 장소를
+    // 또 추가하는 건(더블클릭 등 실수) 막는다.
+    const last = dayStops[dayStops.length - 1]
+    if (last && last.provider === place.provider && last.providerPlaceId === place.providerPlaceId) return
 
     const orderNo = trip.stops.filter((s) => s.dayNo === selectedDay).length
     addStop({
@@ -194,6 +205,8 @@ export function TripEditPage() {
         <MapView
           markers={markers}
           routeSegments={routeSegments}
+          highlightedSegment={hoveredSegment}
+          onSegmentHover={setHoveredSegment}
           center={mapCenter}
           onCenterChanged={setMapCenter}
           className="map-view"
@@ -204,9 +217,13 @@ export function TripEditPage() {
             <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
             <ul className="trip-stop-list">
               {dayStops.map((stop, i) => (
-                <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}`}>
+                <li key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${visitIndex(i)}`}>
                   {i > 0 && (
-                    <div className="travel-mode-row">
+                    <div
+                      className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
+                      onMouseEnter={() => setHoveredSegment(i - 1)}
+                      onMouseLeave={() => setHoveredSegment(null)}
+                    >
                       {TRAVEL_MODES.map((mode) => (
                         <button
                           key={mode}
@@ -223,6 +240,7 @@ export function TripEditPage() {
                           ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
                           : '계산 중...'}
                       </span>
+                      {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
                     </div>
                   )}
                   <div className="trip-stop-row">
