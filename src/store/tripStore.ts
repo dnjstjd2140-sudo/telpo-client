@@ -19,6 +19,7 @@ interface TripState {
   /** 같은 날짜 안에서 stop을 toIndex(0부터) 위치로 옮기고 orderNo를 다시 매긴다. */
   moveStop: (stop: TripStop, toIndex: number) => void
   setTravelMode: (stop: TripStop, mode: TravelMode) => void
+  setMemo: (stop: TripStop, memo: string | null) => void
   markSaved: (trip: Trip) => void
 }
 
@@ -60,6 +61,15 @@ export const useTripStore = create<TripState>((set) => ({
               ...state.trip,
               stops: state.trip.stops.map((s) => (s === stop ? { ...s, travelMode: mode } : s)),
             },
+            isDirty: true,
+          }
+        : state,
+    ),
+  setMemo: (stop, memo) =>
+    set((state) =>
+      state.trip
+        ? {
+            trip: { ...state.trip, stops: state.trip.stops.map((s) => (s === stop ? { ...s, memo } : s)) },
             isDirty: true,
           }
         : state,
