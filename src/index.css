@@ -299,6 +299,22 @@ button {
   font-size: 18px;
 }
 
+.share-link-button {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-primary, #7c3aed);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary, #7c3aed);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.share-link-button:hover {
+  background: var(--color-primary-soft);
+}
+
 .trip-sidebar .subtitle {
   margin: 0;
   color: var(--color-text-muted);
@@ -408,6 +424,27 @@ button {
 .summary-toggle[aria-expanded='true'] {
   border-color: var(--color-primary, #7c3aed);
   color: var(--color-primary, #7c3aed);
+}
+
+.mode-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.share-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.stop-memo-readonly {
+  margin: 4px 0 0 26px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 .memo-toggle {

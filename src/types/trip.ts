@@ -23,6 +23,8 @@ export interface Trip {
   startDate: string | null
   endDate: string | null
   readOnly: boolean
+  /** 읽기 전용 공유 링크(/s/:shareToken)에 쓰는 토큰 */
+  shareToken: string
   stops: TripStop[]
 }
 

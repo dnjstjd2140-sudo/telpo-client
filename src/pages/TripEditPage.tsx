@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { getTripByEditToken, saveTrip } from '@/api/trips'
-import { getRoute } from '@/api/routes'
-import { MapView, type RouteSegment } from '@/components/map/MapView'
+import { MapView } from '@/components/map/MapView'
 import { OrderInput } from '@/components/OrderInput'
 import { PlaceSearch } from '@/components/PlaceSearch'
+import { ShareLinkButton } from '@/components/ShareLinkButton'
 import { RouteDetail } from '@/components/RouteDetail'
 import { StopMemo } from '@/components/StopMemo'
+import { useDayRoutes } from '@/hooks/useDayRoutes'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { formatDuration, formatDistance } from '@/lib/format'
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
-import type { LatLng, RouteResponse } from '@/types/route'
+import type { LatLng } from '@/types/route'
 import { stopToUpdateRequest, type TripStop } from '@/types/trip'
 
 export function TripEditPage() {
@@ -40,13 +41,6 @@ export function TripEditPage() {
   const [panTarget, setPanTarget] = useState<LatLng | null>(null)
   const stopItemRefs = useRef<(HTMLLIElement | null)[]>([])
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
-  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([])
-  // dayStops[i]로 오는 구간의 소요시간/거리. 첫 정류지(index 0)는 이전 구간이 없어 항상 undefined.
-  const [segmentInfo, setSegmentInfo] = useState<Record<number, RouteResponse>>({})
-  // (출발좌표->도착좌표:수단) 단위 클라이언트 캐시. 같은 두 지점 사이를 같은 수단으로 다시 보면
-  // 서버에 또 요청하지 않고 바로 재사용한다 (자차<->도보 왔다갔다 토글해도 이미 본 조합은 재요청 없음).
-  const routeCacheRef = useRef(new Map<string, RouteResponse>())
-
   useEffect(() => {
     if (!editToken) return
     getTripByEditToken(editToken).then((t) => {
@@ -62,67 +56,13 @@ export function TripEditPage() {
     trip
       ?.stops.filter((s) => s.dayNo === selectedDay)
       .sort((a, b) => a.orderNo - b.orderNo) ?? []
-  const routeKey = dayStops.map((s) => `${s.lat},${s.lng},${s.travelMode}`).join('|')
+  const { routeSegments, segmentInfo } = useDayRoutes(dayStops)
 
-  // 구간(이전 정류지 -> 이 정류지)별로 선택된 이동수단에 맞춰 경로를 따로 불러오고, 수단마다 다른 색으로 그린다.
-  // 서버 응답의 durationSeconds/distanceMeters도 같이 받아서 각 구간 줄에 표시한다.
+  // 마커를 눌렀을 때 목록에서 해당 행이 보이도록 스크롤 (훅은 early return보다 위에 있어야 한다)
   useEffect(() => {
-    if (dayStops.length < 2) {
-      setRouteSegments([])
-      setSegmentInfo({})
-      return
-    }
-    let cancelled = false
-    Promise.all(
-      dayStops.slice(1).map((stop, i) => {
-        const from = dayStops[i]
-        const cacheKey = `${from.lat},${from.lng}->${stop.lat},${stop.lng}:${stop.travelMode}`
-        const cached = routeCacheRef.current.get(cacheKey)
-        const result = cached
-          ? Promise.resolve(cached)
-          : getRoute({
-              waypoints: [
-                { lat: from.lat, lng: from.lng },
-                { lat: stop.lat, lng: stop.lng },
-              ],
-              mode: stop.travelMode,
-            }).then((res) => {
-              routeCacheRef.current.set(cacheKey, res)
-              return res
-            })
-
-        return result.then((res) => ({
-          path: res.path,
-          color: TRAVEL_MODE_COLOR[stop.travelMode],
-          dashed: stop.travelMode === 'WALK',
-          // 대중교통은 환승 사이의 도보 구간만 점선으로 그린다
-          dashedRanges: res.legs
-            .filter((leg) => leg.mode === 'WALK' && leg.pathEnd > leg.pathStart)
-            .map((leg): [number, number] => [leg.pathStart, leg.pathEnd]),
-          route: res,
-        }))
-      }),
-    )
-      .then((results) => {
-        if (cancelled) return
-        setRouteSegments(results.map(({ path, color, dashed, dashedRanges }) => ({ path, color, dashed, dashedRanges })))
-        setSegmentInfo(
-          Object.fromEntries(
-            results.map(({ route }, i) => [i + 1, route]),
-          ),
-        )
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRouteSegments([])
-          setSegmentInfo({})
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeKey])
+    if (selectedIndex == null) return
+    stopItemRefs.current[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedIndex])
 
   if (!trip) return <div>불러오는 중...</div>
 
@@ -163,11 +103,6 @@ export function TripEditPage() {
       stayMinutes: null,
     })
   }
-
-  useEffect(() => {
-    if (selectedIndex == null) return
-    stopItemRefs.current[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [selectedIndex])
 
   function handleMove(stop: TripStop, direction: -1 | 1) {
     const currentIndex = dayStops.indexOf(stop)
@@ -213,6 +148,7 @@ export function TripEditPage() {
           {trip.startDate && trip.endDate ? durationLabel(trip.startDate, trip.endDate) : ''}
           {isDirty ? ' · 저장 안 됨' : ''}
         </p>
+        <ShareLinkButton shareToken={trip.shareToken} />
 
         <div className="day-tabs">
           {dayNumbers.map((day) => (
