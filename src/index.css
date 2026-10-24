@@ -264,12 +264,13 @@ button {
   bottom: 0;
   left: 0;
   z-index: 12;
-  width: 360px;
+  /* 좁은 화면에서도 펼침 버튼(24px)이 화면 안에 남도록 폭을 제한한다 */
+  width: min(360px, calc(100vw - 40px));
   transition: transform 0.2s ease;
 }
 
 .trip-sidebar-wrap.collapsed {
-  transform: translateX(-360px);
+  transform: translateX(-100%);
 }
 
 .sidebar-toggle {
@@ -719,4 +720,140 @@ button {
 .save-button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ---- Mobile ---- */
+/* 기준 폭은 src/lib/viewport.ts의 MOBILE_MEDIA_QUERY와 같다.
+   폰에서는 왼쪽 검색 패널을 쓰지 않고, 지도 아래쪽 시트 하나에 검색/일정 탭을 담는다. */
+@media (max-width: 768px) {
+  .home-card {
+    padding: 24px 20px;
+  }
+
+  .home-card h1.brand {
+    font-size: 36px;
+  }
+
+  .map-overlay-panel {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: 45%;
+    padding: 0 12px 12px;
+    border-radius: 14px;
+  }
+
+  /* 탭을 바꿔도 시트 크기가 그대로 유지되도록 펼친 상태에서는 높이를 고정한다 */
+  .mobile-sheet.open {
+    height: 45%;
+  }
+
+  .mobile-sheet .trip-panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 0 8px;
+    padding: 12px 0 8px;
+    background: var(--color-surface);
+  }
+
+  .mobile-sheet:not(.open) .trip-panel-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  /* 순번 바로 옆에 장소 이름이 붙도록 (삭제 버튼이 없는 공유 화면에서 오른쪽으로 밀리지 않게) */
+  .mobile-sheet .place-info {
+    flex: 1;
+  }
+
+  .sheet-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--color-bg);
+  }
+
+  .sheet-tab {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sheet-tab.active {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  /* 시트 안에서는 왼쪽 패널용 배경/테두리/여백을 쓰지 않는다 */
+  .mobile-sheet-body.trip-sidebar {
+    height: auto;
+    overflow: visible;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+
+  .mobile-sheet h1 {
+    margin: 0 0 2px;
+    font-size: 17px;
+  }
+
+  .mobile-sheet .share-link-button {
+    margin-top: 8px;
+  }
+
+  /* 날짜 탭이 많아도 한 줄로 두고 옆으로 넘긴다 */
+  .mobile-sheet .day-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 12px 0 8px;
+    padding-bottom: 2px;
+  }
+
+  .mobile-sheet .day-tab {
+    flex-shrink: 0;
+  }
+
+  .mobile-sheet .place-search {
+    margin-top: 8px;
+    padding-top: 12px;
+  }
+
+  .mobile-sheet .share-empty {
+    margin-top: 8px;
+  }
+
+  /* iOS Safari는 16px보다 작은 입력칸에 포커스하면 화면을 확대해 버린다 */
+  .home-form input,
+  .home-form-full input,
+  .stop-memo {
+    font-size: 16px;
+  }
+
+  /* 손가락으로 누르기 쉽게 작은 버튼들을 키운다 */
+  .place-search-results button,
+  .trip-stop-row button {
+    padding: 8px 12px;
+  }
+
+  .order-buttons button {
+    width: 24px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .mode-btn {
+    padding: 6px;
+    font-size: 12px;
+  }
 }

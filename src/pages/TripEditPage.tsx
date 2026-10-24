@@ -12,6 +12,7 @@ import { useDayRoutes } from '@/hooks/useDayRoutes'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { formatDuration, formatDistance } from '@/lib/format'
+import { useIsMobile } from '@/lib/viewport'
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
 import type { LatLng } from '@/types/route'
@@ -35,6 +36,9 @@ export function TripEditPage() {
   // 일정 목록의 이동 구간이나 지도 위 경로선에 마우스를 올리면 양쪽 모두에서 그 구간을 강조한다.
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelOpen, setPanelOpen] = useState(true)
+  // 폰에서는 왼쪽 검색 패널 대신 아래 시트 하나에 검색/일정을 탭으로 담는다.
+  const isMobile = useIsMobile()
+  const [mobileTab, setMobileTab] = useState<'search' | 'schedule'>('search')
   // 선택된 정류지(dayStops 기준 index). 마커를 누르거나 목록 행을 누르면 바뀌고, 둘 다에 강조 표시된다.
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   // 목록 행을 눌렀을 때 지도를 그 마커로 옮기기 위한 요청 (새 객체를 넣을 때마다 이동)
@@ -47,6 +51,7 @@ export function TripEditPage() {
       setTrip(t, { editToken })
       if (t.stops.length > 0) {
         setMapCenter({ lat: t.stops[0].lat, lng: t.stops[0].lng })
+        setMobileTab('schedule')
       }
     })
   }, [editToken, setTrip])
@@ -139,36 +144,224 @@ export function TripEditPage() {
     }
   }
 
+  const tripInfo = (
+    <>
+      <h1>{trip.title}</h1>
+      <p className="subtitle">
+        {trip.startDate && trip.endDate ? durationLabel(trip.startDate, trip.endDate) : ''}
+        {isDirty ? ' · 저장 안 됨' : ''}
+      </p>
+      <ShareLinkButton shareToken={trip.shareToken} />
+    </>
+  )
+
+  const dayTabs = (
+    <div className="day-tabs">
+      {dayNumbers.map((day) => (
+        <button
+          key={day}
+          type="button"
+          className={day === selectedDay ? 'day-tab active' : 'day-tab'}
+          onClick={() => {
+            setSelectedDay(day)
+            setSelectedIndex(null)
+          }}
+        >
+          <span>Day {day}</span>
+          {trip.startDate && <span className="day-tab-date">{formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
+        </button>
+      ))}
+    </div>
+  )
+
+  const placeSearch = <PlaceSearch center={mapCenter} onAdd={handleAdd} />
+
+  const panelToggle = (
+    <button
+      type="button"
+      className="summary-toggle"
+      aria-expanded={panelOpen}
+      aria-label={panelOpen ? '일정 패널 접기' : '일정 패널 펼치기'}
+      onClick={() => setPanelOpen((open) => !open)}
+    >
+      {panelOpen ? '접기 ▴' : '펼치기 ▾'}
+    </button>
+  )
+
+  const stopList = (
+    <>
+      <ul className="trip-stop-list">
+        {dayStops.map((stop, i) => (
+          <li
+            key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${visitIndex(i)}`}
+            ref={(el) => {
+              stopItemRefs.current[i] = el
+            }}
+          >
+            {i > 0 && (
+              <div
+                className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
+                onMouseEnter={() => setHoveredSegment(i - 1)}
+                onMouseLeave={() => setHoveredSegment(null)}
+              >
+                {TRAVEL_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={stop.travelMode === mode ? 'mode-btn active' : 'mode-btn'}
+                    style={stop.travelMode === mode ? { borderColor: TRAVEL_MODE_COLOR[mode], color: TRAVEL_MODE_COLOR[mode] } : undefined}
+                    onClick={() => setTravelMode(stop, mode)}
+                  >
+                    {TRAVEL_MODE_LABEL[mode]}
+                  </button>
+                ))}
+                <span className="travel-mode-info">
+                  {segmentInfo[i]
+                    ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
+                    : '계산 중...'}
+                </span>
+                {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
+              </div>
+            )}
+            <div
+              className={selectedIndex === i ? 'trip-stop-row selected' : 'trip-stop-row'}
+              onClick={(e) => handleSelectStop(stop, i, e.target)}
+            >
+              <div className="order-controls">
+                <OrderInput value={i + 1} max={dayStops.length} onCommit={(to) => handleReorder(stop, to)} />
+                <div className="order-buttons">
+                  <button
+                    type="button"
+                    aria-label="위로 이동"
+                    disabled={i === 0}
+                    onClick={() => handleMove(stop, -1)}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="아래로 이동"
+                    disabled={i === dayStops.length - 1}
+                    onClick={() => handleMove(stop, 1)}
+                  >
+                    ▼
+                  </button>
+                </div>
+              </div>
+              <div className="place-info">
+                <strong>{stop.name}</strong>
+                {stop.address && <span>{stop.address}</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  removeStop(stop)
+                  setSelectedIndex(null)
+                }}
+              >
+                삭제
+              </button>
+            </div>
+            <StopMemo memo={stop.memo} onChange={(memo) => setMemo(stop, memo)} />
+          </li>
+        ))}
+      </ul>
+
+      <button type="button" className="save-button" onClick={handleSave} disabled={isSaving || !isDirty}>
+        {isSaving ? '저장 중...' : '저장'}
+      </button>
+    </>
+  )
+
+  const mapView = (
+    <MapView
+      markers={markers}
+      routeSegments={routeSegments}
+      highlightedSegment={hoveredSegment}
+      onSegmentHover={setHoveredSegment}
+      onMarkerClick={(index) => {
+        setSelectedIndex(index)
+        if (isMobile) {
+          setMobileTab('schedule')
+          setPanelOpen(true)
+        }
+      }}
+      selectedMarker={selectedIndex}
+      panTo={panTarget}
+      center={mapCenter}
+      onCenterChanged={setMapCenter}
+      className="map-view"
+    />
+  )
+
+  if (isMobile) {
+    return (
+      <div className="trip-layout">
+        <main className="trip-map">
+          {mapView}
+
+          <div className={panelOpen ? 'map-overlay-panel mobile-sheet open' : 'map-overlay-panel mobile-sheet'}>
+            <div className="trip-panel-header mobile-sheet-header">
+              <div className="sheet-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mobileTab === 'search'}
+                  className={mobileTab === 'search' ? 'sheet-tab active' : 'sheet-tab'}
+                  onClick={() => {
+                    setMobileTab('search')
+                    setPanelOpen(true)
+                  }}
+                >
+                  검색
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mobileTab === 'schedule'}
+                  className={mobileTab === 'schedule' ? 'sheet-tab active' : 'sheet-tab'}
+                  onClick={() => {
+                    setMobileTab('schedule')
+                    setPanelOpen(true)
+                  }}
+                >
+                  일정 ({dayStops.length})
+                </button>
+              </div>
+              {panelToggle}
+            </div>
+
+            {panelOpen &&
+              (mobileTab === 'search' ? (
+                <div className="trip-sidebar mobile-sheet-body">
+                  {tripInfo}
+                  {dayTabs}
+                  {placeSearch}
+                </div>
+              ) : (
+                <>
+                  {dayTabs}
+                  {dayStops.length > 0 ? (
+                    stopList
+                  ) : (
+                    <p className="share-empty">아직 추가한 장소가 없어요. 검색 탭에서 장소를 추가해 보세요.</p>
+                  )}
+                </>
+              ))}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="trip-layout">
       <div className={sidebarOpen ? 'trip-sidebar-wrap' : 'trip-sidebar-wrap collapsed'}>
-      <aside className="trip-sidebar">
-        <h1>{trip.title}</h1>
-        <p className="subtitle">
-          {trip.startDate && trip.endDate ? durationLabel(trip.startDate, trip.endDate) : ''}
-          {isDirty ? ' · 저장 안 됨' : ''}
-        </p>
-        <ShareLinkButton shareToken={trip.shareToken} />
-
-        <div className="day-tabs">
-          {dayNumbers.map((day) => (
-            <button
-              key={day}
-              type="button"
-              className={day === selectedDay ? 'day-tab active' : 'day-tab'}
-              onClick={() => {
-                setSelectedDay(day)
-                setSelectedIndex(null)
-              }}
-            >
-              <span>Day {day}</span>
-              {trip.startDate && <span className="day-tab-date">{formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
-            </button>
-          ))}
-        </div>
-
-        <PlaceSearch center={mapCenter} onAdd={handleAdd} />
-      </aside>
+        <aside className="trip-sidebar">
+          {tripInfo}
+          {dayTabs}
+          {placeSearch}
+        </aside>
         <button
           type="button"
           className="sidebar-toggle"
@@ -180,119 +373,15 @@ export function TripEditPage() {
         </button>
       </div>
       <main className="trip-map">
-        <MapView
-          markers={markers}
-          routeSegments={routeSegments}
-          highlightedSegment={hoveredSegment}
-          onSegmentHover={setHoveredSegment}
-          onMarkerClick={setSelectedIndex}
-          selectedMarker={selectedIndex}
-          panTo={panTarget}
-          center={mapCenter}
-          onCenterChanged={setMapCenter}
-          className="map-view"
-        />
+        {mapView}
 
         {dayStops.length > 0 && (
           <div className="map-overlay-panel">
             <div className="trip-panel-header">
               <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
-              <div className="trip-panel-actions">
-                <button
-                  type="button"
-                  className="summary-toggle"
-                  aria-expanded={panelOpen}
-                  aria-label={panelOpen ? '일정 패널 접기' : '일정 패널 펼치기'}
-                  onClick={() => setPanelOpen((open) => !open)}
-                >
-                  {panelOpen ? '접기 ▴' : '펼치기 ▾'}
-                </button>
-              </div>
+              <div className="trip-panel-actions">{panelToggle}</div>
             </div>
-            {panelOpen && (
-              <>
-            <ul className="trip-stop-list">
-              {dayStops.map((stop, i) => (
-                <li
-                  key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${visitIndex(i)}`}
-                  ref={(el) => {
-                    stopItemRefs.current[i] = el
-                  }}
-                >
-                  {i > 0 && (
-                    <div
-                      className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
-                      onMouseEnter={() => setHoveredSegment(i - 1)}
-                      onMouseLeave={() => setHoveredSegment(null)}
-                    >
-                      {TRAVEL_MODES.map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={stop.travelMode === mode ? 'mode-btn active' : 'mode-btn'}
-                          style={stop.travelMode === mode ? { borderColor: TRAVEL_MODE_COLOR[mode], color: TRAVEL_MODE_COLOR[mode] } : undefined}
-                          onClick={() => setTravelMode(stop, mode)}
-                        >
-                          {TRAVEL_MODE_LABEL[mode]}
-                        </button>
-                      ))}
-                      <span className="travel-mode-info">
-                        {segmentInfo[i]
-                          ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
-                          : '계산 중...'}
-                      </span>
-                      {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
-                    </div>
-                  )}
-                  <div
-                    className={selectedIndex === i ? 'trip-stop-row selected' : 'trip-stop-row'}
-                    onClick={(e) => handleSelectStop(stop, i, e.target)}
-                  >
-                    <div className="order-controls">
-                      <OrderInput value={i + 1} max={dayStops.length} onCommit={(to) => handleReorder(stop, to)} />
-                      <div className="order-buttons">
-                        <button
-                          type="button"
-                          aria-label="위로 이동"
-                          disabled={i === 0}
-                          onClick={() => handleMove(stop, -1)}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="아래로 이동"
-                          disabled={i === dayStops.length - 1}
-                          onClick={() => handleMove(stop, 1)}
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
-                    <div className="place-info">
-                      <strong>{stop.name}</strong>
-                      {stop.address && <span>{stop.address}</span>}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removeStop(stop)
-                        setSelectedIndex(null)
-                      }}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                  <StopMemo memo={stop.memo} onChange={(memo) => setMemo(stop, memo)} />
-                </li>
-              ))}
-            </ul>
-
-            <button type="button" className="save-button" onClick={handleSave} disabled={isSaving || !isDirty}>
-              {isSaving ? '저장 중...' : '저장'}
-            </button>
-              </>
-            )}
+            {panelOpen && stopList}
           </div>
         )}
       </main>

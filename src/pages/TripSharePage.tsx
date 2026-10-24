@@ -8,6 +8,7 @@ import { useDayRoutes } from '@/hooks/useDayRoutes'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL } from '@/lib/constants'
 import { addDays, durationLabel, formatMonthDay, tripDayNumbers } from '@/lib/date'
 import { formatDistance, formatDuration } from '@/lib/format'
+import { useIsMobile } from '@/lib/viewport'
 import { useTripStore } from '@/store/tripStore'
 import type { LatLng } from '@/types/route'
 import type { TripStop } from '@/types/trip'
@@ -22,6 +23,8 @@ export function TripSharePage() {
   const [selectedDay, setSelectedDay] = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelOpen, setPanelOpen] = useState(true)
+  // 폰에서는 왼쪽 패널 없이 아래 시트 하나에 여행 정보와 일정을 함께 담는다.
+  const isMobile = useIsMobile()
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_MAP_CENTER)
@@ -58,31 +61,146 @@ export function TripSharePage() {
     order: i + 1,
   }))
 
+  const tripInfo = (
+    <>
+      <h1>{trip.title}</h1>
+      <p className="subtitle">
+        {trip.startDate && trip.endDate ? `${durationLabel(trip.startDate, trip.endDate)} · ` : ''}읽기 전용 보기
+      </p>
+    </>
+  )
+
+  const dayTabs = (
+    <div className="day-tabs">
+      {dayNumbers.map((day) => (
+        <button
+          key={day}
+          type="button"
+          className={day === selectedDay ? 'day-tab active' : 'day-tab'}
+          onClick={() => {
+            setSelectedDay(day)
+            setSelectedIndex(null)
+          }}
+        >
+          <span>Day {day}</span>
+          {trip.startDate && <span className="day-tab-date">{formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
+        </button>
+      ))}
+    </div>
+  )
+
+  const panelHeader = (
+    <div className="trip-panel-header">
+      <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
+      <div className="trip-panel-actions">
+        <button
+          type="button"
+          className="summary-toggle"
+          aria-expanded={panelOpen}
+          aria-label={panelOpen ? '일정 패널 접기' : '일정 패널 펼치기'}
+          onClick={() => setPanelOpen((open) => !open)}
+        >
+          {panelOpen ? '접기 ▴' : '펼치기 ▾'}
+        </button>
+      </div>
+    </div>
+  )
+
+  const stopList =
+    dayStops.length === 0 ? (
+      <p className="share-empty">이 날은 등록된 일정이 없어요.</p>
+    ) : (
+      <ul className="trip-stop-list">
+        {dayStops.map((stop, i) => (
+          <li
+            key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${stop.orderNo}`}
+            ref={(el) => {
+              stopItemRefs.current[i] = el
+            }}
+          >
+            {i > 0 && (
+              <div
+                className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
+                onMouseEnter={() => setHoveredSegment(i - 1)}
+                onMouseLeave={() => setHoveredSegment(null)}
+              >
+                <span className="mode-label" style={{ color: TRAVEL_MODE_COLOR[stop.travelMode] }}>
+                  {TRAVEL_MODE_LABEL[stop.travelMode]}
+                </span>
+                <span className="travel-mode-info">
+                  {segmentInfo[i]
+                    ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
+                    : '계산 중...'}
+                </span>
+                {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
+              </div>
+            )}
+            <div
+              className={selectedIndex === i ? 'trip-stop-row selected' : 'trip-stop-row'}
+              onClick={() => {
+                setSelectedIndex(i)
+                setPanTarget({ lat: stop.lat, lng: stop.lng })
+              }}
+            >
+              <div className="order-controls">
+                <span className="order-badge">{i + 1}</span>
+              </div>
+              <div className="place-info">
+                <strong>{stop.name}</strong>
+                {stop.address && <span>{stop.address}</span>}
+              </div>
+            </div>
+            {stop.memo && <p className="stop-memo-readonly">{stop.memo}</p>}
+          </li>
+        ))}
+      </ul>
+    )
+
+  const mapView = (
+    <MapView
+      markers={markers}
+      routeSegments={routeSegments}
+      highlightedSegment={hoveredSegment}
+      onSegmentHover={setHoveredSegment}
+      onMarkerClick={(index) => {
+        setSelectedIndex(index)
+        if (isMobile) setPanelOpen(true)
+      }}
+      selectedMarker={selectedIndex}
+      panTo={panTarget}
+      center={mapCenter}
+      onCenterChanged={setMapCenter}
+      className="map-view"
+    />
+  )
+
+  if (isMobile) {
+    return (
+      <div className="trip-layout">
+        <main className="trip-map">
+          {mapView}
+
+          <div className={panelOpen ? 'map-overlay-panel mobile-sheet open' : 'map-overlay-panel mobile-sheet'}>
+            {panelHeader}
+            {panelOpen && (
+              <>
+                <div className="trip-sidebar mobile-sheet-body">{tripInfo}</div>
+                {dayTabs}
+                {stopList}
+              </>
+            )}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="trip-layout">
       <div className={sidebarOpen ? 'trip-sidebar-wrap' : 'trip-sidebar-wrap collapsed'}>
         <aside className="trip-sidebar">
-          <h1>{trip.title}</h1>
-          <p className="subtitle">
-            {trip.startDate && trip.endDate ? `${durationLabel(trip.startDate, trip.endDate)} · ` : ''}읽기 전용 보기
-          </p>
-
-          <div className="day-tabs">
-            {dayNumbers.map((day) => (
-              <button
-                key={day}
-                type="button"
-                className={day === selectedDay ? 'day-tab active' : 'day-tab'}
-                onClick={() => {
-                  setSelectedDay(day)
-                  setSelectedIndex(null)
-                }}
-              >
-                <span>Day {day}</span>
-                {trip.startDate && <span className="day-tab-date">{formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
-              </button>
-            ))}
-          </div>
+          {tripInfo}
+          {dayTabs}
         </aside>
         <button
           type="button"
@@ -96,84 +214,11 @@ export function TripSharePage() {
       </div>
 
       <main className="trip-map">
-        <MapView
-          markers={markers}
-          routeSegments={routeSegments}
-          highlightedSegment={hoveredSegment}
-          onSegmentHover={setHoveredSegment}
-          onMarkerClick={setSelectedIndex}
-          selectedMarker={selectedIndex}
-          panTo={panTarget}
-          center={mapCenter}
-          onCenterChanged={setMapCenter}
-          className="map-view"
-        />
+        {mapView}
 
         <div className="map-overlay-panel">
-          <div className="trip-panel-header">
-            <h2 className="trip-panel-title">이번 일정 ({dayStops.length})</h2>
-            <div className="trip-panel-actions">
-              <button
-                type="button"
-                className="summary-toggle"
-                aria-expanded={panelOpen}
-                aria-label={panelOpen ? '일정 패널 접기' : '일정 패널 펼치기'}
-                onClick={() => setPanelOpen((open) => !open)}
-              >
-                {panelOpen ? '접기 ▴' : '펼치기 ▾'}
-              </button>
-            </div>
-          </div>
-
-          {panelOpen &&
-            (dayStops.length === 0 ? (
-              <p className="share-empty">이 날은 등록된 일정이 없어요.</p>
-            ) : (
-              <ul className="trip-stop-list">
-                {dayStops.map((stop, i) => (
-                  <li
-                    key={`${stop.provider}:${stop.providerPlaceId}:${stop.dayNo}:${stop.orderNo}`}
-                    ref={(el) => {
-                      stopItemRefs.current[i] = el
-                    }}
-                  >
-                    {i > 0 && (
-                      <div
-                        className={hoveredSegment === i - 1 ? 'travel-mode-row hovered' : 'travel-mode-row'}
-                        onMouseEnter={() => setHoveredSegment(i - 1)}
-                        onMouseLeave={() => setHoveredSegment(null)}
-                      >
-                        <span className="mode-label" style={{ color: TRAVEL_MODE_COLOR[stop.travelMode] }}>
-                          {TRAVEL_MODE_LABEL[stop.travelMode]}
-                        </span>
-                        <span className="travel-mode-info">
-                          {segmentInfo[i]
-                            ? `${formatDuration(segmentInfo[i].durationSeconds)} · ${formatDistance(segmentInfo[i].distanceMeters)}`
-                            : '계산 중...'}
-                        </span>
-                        {segmentInfo[i] && <RouteDetail route={segmentInfo[i]} mode={stop.travelMode} />}
-                      </div>
-                    )}
-                    <div
-                      className={selectedIndex === i ? 'trip-stop-row selected' : 'trip-stop-row'}
-                      onClick={() => {
-                        setSelectedIndex(i)
-                        setPanTarget({ lat: stop.lat, lng: stop.lng })
-                      }}
-                    >
-                      <div className="order-controls">
-                        <span className="order-badge">{i + 1}</span>
-                      </div>
-                      <div className="place-info">
-                        <strong>{stop.name}</strong>
-                        {stop.address && <span>{stop.address}</span>}
-                      </div>
-                    </div>
-                    {stop.memo && <p className="stop-memo-readonly">{stop.memo}</p>}
-                  </li>
-                ))}
-              </ul>
-            ))}
+          {panelHeader}
+          {panelOpen && stopList}
         </div>
       </main>
     </div>
