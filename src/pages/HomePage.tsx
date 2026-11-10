@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { createTrip } from '@/api/trips'
 import { durationLabel } from '@/lib/date'
-import { addLocalTrip, getLocalTrips } from '@/lib/localTrips'
+import { addLocalTrip, getLocalTrips, removeLocalTrip } from '@/lib/localTrips'
+import type { LocalTripRef } from '@/types/trip'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -15,7 +16,14 @@ export function HomePage() {
   const [startDate, setStartDate] = useState(today())
   const [endDate, setEndDate] = useState(today())
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const localTrips = getLocalTrips()
+  const [localTrips, setLocalTrips] = useState(getLocalTrips)
+
+  // "내 여행"은 브라우저 바로가기일 뿐이라 목록에서만 빠지고, 서버의 여행 데이터는 그대로 남는다.
+  function handleRemove(trip: LocalTripRef) {
+    if (!window.confirm(`"${trip.title}"을(를) 내 여행 목록에서 지울까요?`)) return
+    removeLocalTrip(trip.tripId)
+    setLocalTrips(getLocalTrips())
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -82,6 +90,14 @@ export function HomePage() {
               {localTrips.map((t) => (
                 <li key={t.tripId}>
                   <Link to={`/t/${t.editToken}`}>{t.title}</Link>
+                  <button
+                    type="button"
+                    className="home-trip-remove"
+                    aria-label={`${t.title} 지우기`}
+                    onClick={() => handleRemove(t)}
+                  >
+                    ×
+                  </button>
                 </li>
               ))}
             </ul>

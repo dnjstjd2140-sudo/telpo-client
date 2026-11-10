@@ -227,8 +227,19 @@ button {
   gap: 4px;
 }
 
+.home-trip-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .home-trip-list a {
   display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 8px 10px;
   border-radius: 8px;
   color: var(--color-text);
@@ -237,6 +248,24 @@ button {
 
 .home-trip-list a:hover {
   background: var(--color-bg);
+}
+
+.home-trip-remove {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.home-trip-remove:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 /* ---- Trip layout (edit / share) ---- */
