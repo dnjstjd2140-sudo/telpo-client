@@ -350,7 +350,7 @@ export function TripEditPage() {
 
             {panelOpen &&
               (mobileTab === 'search' ? (
-                <div className="trip-sidebar mobile-sheet-body">
+                <div className="trip-sidebar mobile-sheet-body search-sidebar">
                   {tripInfo}
                   {dayTabs}
                   {placeSearch}
@@ -374,7 +374,7 @@ export function TripEditPage() {
   return (
     <div className="trip-layout">
       <div className={sidebarOpen ? 'trip-sidebar-wrap' : 'trip-sidebar-wrap collapsed'}>
-        <aside className="trip-sidebar">
+        <aside className="trip-sidebar search-sidebar">
           {tripInfo}
           {dayTabs}
           {placeSearch}
