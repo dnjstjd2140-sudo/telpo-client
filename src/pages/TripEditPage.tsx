@@ -5,7 +5,7 @@ import { getTripByEditToken, saveTrip } from '@/api/trips'
 import { MapView } from '@/components/map/MapView'
 import { OrderInput } from '@/components/OrderInput'
 import { PlaceSearch } from '@/components/PlaceSearch'
-import { ShareLinkButton } from '@/components/ShareLinkButton'
+import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { RouteDetail } from '@/components/RouteDetail'
 import { StopMemo } from '@/components/StopMemo'
 import { useDayRoutes } from '@/hooks/useDayRoutes'
@@ -151,7 +151,20 @@ export function TripEditPage() {
         {trip.startDate && trip.endDate ? durationLabel(trip.startDate, trip.endDate) : ''}
         {isDirty ? ' · 저장 안 됨' : ''}
       </p>
-      <ShareLinkButton shareToken={trip.shareToken} />
+      <div className="link-buttons">
+        <CopyLinkButton
+          path={`/s/${trip.shareToken}`}
+          label="공유 링크 복사"
+          promptMessage="아래 링크를 복사해서 공유하세요"
+        />
+        {editToken && (
+          <CopyLinkButton
+            path={`/t/${editToken}`}
+            label="편집 링크 복사"
+            promptMessage="같이 수정할 사람에게만 보내세요 (이 링크로 누구나 수정할 수 있어요)"
+          />
+        )}
+      </div>
     </>
   )
 

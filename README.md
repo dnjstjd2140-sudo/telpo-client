@@ -75,9 +75,11 @@ src/
 
 ## 공유
 
-- 편집 화면 왼쪽 패널의 "공유 링크 복사" 버튼(`components/ShareLinkButton.tsx`)이 읽기 전용 링크
+- 편집 화면 왼쪽 패널의 "공유 링크 복사" 버튼(`components/CopyLinkButton.tsx`)이 읽기 전용 링크
   `<현재 주소>/s/<shareToken>`을 클립보드에 복사함. 공유 토큰은 `GET /api/trips/edit/{editToken}` 응답의
   `shareToken`으로 받음
+- 옆의 "편집 링크 복사" 버튼은 같이 수정할 사람에게 보낼 `<현재 주소>/t/<editToken>`을 복사함.
+  저장 시 서버가 일정 전체를 덮어쓰므로 동시에 수정하면 나중에 저장한 쪽만 남음
 - `/s/:shareToken`(`pages/TripSharePage.tsx`)은 편집 화면과 같은 지도·경로선·구간 상세·메모를 읽기 전용으로 보여줌
   (일차 탭, 마커-목록 연동, 패널 접기). 수정·삭제·순서 변경은 불가
 - 공유 화면은 **마지막으로 저장한 상태**를 보여줌. 경로 계산은 `hooks/useDayRoutes.ts`를 편집 화면과 같이 써서
