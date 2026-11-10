@@ -91,3 +91,25 @@ src/
 - `npm run build` — 타입체크(`tsc -b`) + 프로덕션 빌드
 - `npm run lint` — oxlint
 - `npm run preview` — 빌드 결과 로컬 프리뷰
+
+## 배포 (운영)
+
+클라이언트는 별도 서버에 올리지 않는다. `telpo-server` 저장소의 `docker-compose.prod.yml` 이 이 저장소(`../telpo-client`)를
+`npm build` 해서 nginx 이미지(`web`)에 담아 `/api` 는 Spring Boot 로 프록시한다. 운영 서버: Vultr, `http://64.176.229.225`.
+전체 절차·명령어는 `C:\workspace\telpo\배포_가이드.md` 참고.
+
+### 클라이언트 코드를 수정한 뒤 재배포
+
+```bash
+# 1) 내 PC: 수정 → npm run build 로 확인 → 커밋 → push (main)
+# 2) 운영 서버:
+ssh root@64.176.229.225
+cd /opt/telpo/telpo-client && git pull
+cd /opt/telpo/telpo-server
+docker compose -f docker-compose.prod.yml up -d --build web    # web 이미지를 다시 빌드·교체
+```
+
+- 빌드 결과물이 이미지 안에 들어가므로 `restart` 만으로는 반영되지 않는다. 반드시 `--build`.
+- 반영 후 브라우저에서 `Ctrl+Shift+R` (캐시 무시 새로고침).
+- `VITE_KAKAO_JS_KEY` 는 빌드 시점에 박힌다. 서버의 `/opt/telpo/telpo-server/.env` 에서 바꾼 뒤 위와 같이 `--build`.
+- 카카오 디벨로퍼스의 JavaScript SDK 도메인에 접속 주소(`http://64.176.229.225`)가 등록되어 있어야 지도가 뜬다.
