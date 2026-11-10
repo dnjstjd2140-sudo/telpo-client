@@ -6,6 +6,7 @@ import { MapView } from '@/components/map/MapView'
 import { OrderInput } from '@/components/OrderInput'
 import { PlaceSearch } from '@/components/PlaceSearch'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
+import { PlaceLink } from '@/components/PlaceLink'
 import { RouteDetail } from '@/components/RouteDetail'
 import { StopMemo } from '@/components/StopMemo'
 import { useDayRoutes } from '@/hooks/useDayRoutes'
@@ -262,8 +263,11 @@ export function TripEditPage() {
                 </div>
               </div>
               <div className="place-info">
-                <strong>{stop.name}</strong>
-                {stop.address && <span>{stop.address}</span>}
+                <div className="place-name">
+                  <strong title={stop.name}>{stop.name}</strong>
+                  <PlaceLink provider={stop.provider} providerPlaceId={stop.providerPlaceId} name={stop.name} />
+                </div>
+                {stop.address && <span title={stop.address}>{stop.address}</span>}
               </div>
               <button
                 type="button"

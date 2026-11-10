@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { searchPlaces } from '@/api/places'
+import { PlaceLink } from '@/components/PlaceLink'
 import type { PlaceSearchResult } from '@/types/place'
 import type { LatLng } from '@/types/route'
 
@@ -48,8 +49,11 @@ export function PlaceSearch({ center, onAdd }: PlaceSearchProps) {
           {results.map((place) => (
             <li key={`${place.provider}:${place.providerPlaceId}`}>
               <div className="place-info">
-                <strong>{place.name}</strong>
-                {place.address && <span>{place.address}</span>}
+                <div className="place-name">
+                  <strong title={place.name}>{place.name}</strong>
+                  <PlaceLink provider={place.provider} providerPlaceId={place.providerPlaceId} name={place.name} />
+                </div>
+                {place.address && <span title={place.address}>{place.address}</span>}
               </div>
               <button type="button" onClick={() => onAdd(place)}>
                 추가

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { getTripByShareToken } from '@/api/trips'
 import { MapView } from '@/components/map/MapView'
+import { PlaceLink } from '@/components/PlaceLink'
 import { RouteDetail } from '@/components/RouteDetail'
 import { useDayRoutes } from '@/hooks/useDayRoutes'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL } from '@/lib/constants'
@@ -146,8 +147,11 @@ export function TripSharePage() {
                 <span className="order-badge">{i + 1}</span>
               </div>
               <div className="place-info">
-                <strong>{stop.name}</strong>
-                {stop.address && <span>{stop.address}</span>}
+                <div className="place-name">
+                  <strong title={stop.name}>{stop.name}</strong>
+                  <PlaceLink provider={stop.provider} providerPlaceId={stop.providerPlaceId} name={stop.name} />
+                </div>
+                {stop.address && <span title={stop.address}>{stop.address}</span>}
               </div>
             </div>
             {stop.memo && <p className="stop-memo-readonly">{stop.memo}</p>}

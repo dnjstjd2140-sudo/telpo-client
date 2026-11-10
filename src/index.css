@@ -562,6 +562,33 @@ button {
 
 .place-info strong {
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 장소 이름 + 카카오맵 바로가기를 한 줄에 둔다. 이름이 길면 이름만 줄어든다. */
+.place-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.place-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+
+.place-link:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 .place-info span {
