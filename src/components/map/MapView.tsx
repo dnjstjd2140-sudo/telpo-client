@@ -10,10 +10,30 @@ function lineStyle(index: number, total: number, highlighted: number | null, wei
   const isHighlighted = index === highlighted
   return {
     strokeWeight: isHighlighted ? weight + 2 : weight,
-    strokeOpacity: highlighted == null ? 0.75 : isHighlighted ? 0.95 : 0.3,
-    zIndex: isHighlighted ? 500 : total - index,
+    strokeOpacity: highlighted == null ? 0.85 : isHighlighted ? 0.95 : 0.3,
+    zIndex: isHighlighted ? 1000 : (total - index) * 2,
   }
 }
+
+/** 색 선 아래에 까는 흰 테두리. 축소해서 선이 가늘어져도 지도 배경(도로/지형)과 구분되게 한다. */
+function casingStyle(index: number, total: number, highlighted: number | null, weight: number) {
+  const line = lineStyle(index, total, highlighted, weight)
+  return {
+    strokeWeight: line.strokeWeight + 3,
+    strokeOpacity: highlighted == null ? 0.9 : index === highlighted ? 1 : 0.35,
+    zIndex: line.zIndex - 1,
+  }
+}
+
+/** 지도를 모든 지점이 보이게 맞출 때, 지도 위에 겹친 패널에 가려지지 않도록 비워 둘 여백(px) */
+export interface FitPadding {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+const DEFAULT_FIT_PADDING: FitPadding = { top: 60, right: 60, bottom: 60, left: 60 }
 
 /** 경로를 실선/점선 조각으로 나눈다. 조각 사이가 끊겨 보이지 않도록 경계 좌표는 양쪽에 포함한다. */
 function splitByDash<T>(
@@ -71,19 +91,23 @@ export interface MapViewProps {
   className?: string
   /** 지도 이동/줌이 끝날 때마다 중심 좌표를 알려준다 (장소 검색 기준점 등에 사용) */
   onCenterChanged?: (center: LatLng) => void
+  /** 이 값이 바뀔 때(처음 불러올 때, 일차 탭을 바꿀 때 등) 모든 마커와 경로가 화면에 들어오게 맞춘다. */
+  fitKey?: string | number
+  /** 화면 맞춤 시 패널에 가려지는 쪽에 둘 여백 */
+  fitPadding?: FitPadding
 }
 
 /**
  * 카카오맵 SDK 호출은 이 컴포넌트 내부로 한정한다.
  * country_code에 따라 provider를 바꾸게 되면(3단계) 이 컴포넌트만 교체/분기한다.
  */
-export function MapView({ markers, routeSegments, highlightedSegment, onSegmentHover, onMarkerClick, selectedMarker, panTo, center, className, onCenterChanged }: MapViewProps) {
+export function MapView({ markers, routeSegments, highlightedSegment, onSegmentHover, onMarkerClick, selectedMarker, panTo, center, className, onCenterChanged, fitKey, fitPadding }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<kakao.maps.Map | null>(null)
   const markerObjsRef = useRef<kakao.maps.Marker[]>([])
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([])
   const polylinesRef = useRef<kakao.maps.Polyline[]>([])
-  const visibleLinesRef = useRef<kakao.maps.Polyline[][]>([])
+  const visibleLinesRef = useRef<{ lines: kakao.maps.Polyline[]; casings: kakao.maps.Polyline[] }[]>([])
   const weightRef = useRef(3)
   const highlightRef = useRef<number | null>(null)
   const onSegmentHoverRef = useRef(onSegmentHover)
@@ -131,8 +155,29 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
     return () => observer.disconnect()
   }, [])
 
-  // 마커 갱신 (마커가 늘어나면 새로 추가된 위치로 이동)
+  // 모든 마커와 경로 좌표가 화면에 들어오게 지도를 맞춘다 (패널에 가려지는 쪽은 여백을 더 준다)
+  const routeSegmentsRef = useRef(routeSegments)
+  routeSegmentsRef.current = routeSegments
+  const fitPaddingRef = useRef(fitPadding)
+  fitPaddingRef.current = fitPadding
+  function fitToAll() {
+    const map = mapRef.current
+    if (!map) return
+    const points = [...markers.map((m) => m.position), ...(routeSegmentsRef.current ?? []).flatMap((s) => s.path)]
+    if (points.length === 0) return
+    if (points.length === 1) {
+      map.panTo(new window.kakao.maps.LatLng(points[0].lat, points[0].lng))
+      return
+    }
+    const bounds = new window.kakao.maps.LatLngBounds()
+    points.forEach((p) => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)))
+    const { top, right, bottom, left } = fitPaddingRef.current ?? DEFAULT_FIT_PADDING
+    map.setBounds(bounds, top, right, bottom, left)
+  }
+
+  // 마커 갱신 (fitKey가 바뀌면 전체가 보이게 맞추고, 마커가 늘어나면 새로 추가된 위치로 이동)
   const prevMarkerCountRef = useRef(0)
+  const fittedKeyRef = useRef<string | number | undefined>(undefined)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -168,12 +213,16 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
         return overlay
       })
 
-    if (markers.length > prevMarkerCountRef.current) {
+    if (fitKey !== undefined && fitKey !== fittedKeyRef.current && markers.length > 0) {
+      fittedKeyRef.current = fitKey
+      fitToAll()
+    } else if (markers.length > prevMarkerCountRef.current) {
       const last = markers[markers.length - 1].position
       map.panTo(new window.kakao.maps.LatLng(last.lat, last.lng))
     }
     prevMarkerCountRef.current = markers.length
-  }, [markers, selectedMarker])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markers, selectedMarker, fitKey])
 
   // 외부(일정 목록)에서 요청한 좌표로 지도를 이동한다
   useEffect(() => {
@@ -188,8 +237,9 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
     if (!map) return
 
     polylinesRef.current.forEach((line) => line.setMap(null))
-    // 축소할수록 선을 얇게 그려 전체 일정을 볼 때 선끼리 뭉치지 않게 한다 (확대 시에는 굵게 + 방향 화살표)
-    const weight = Math.max(1, Math.round(10 / 1.5 ** Math.max(0, zoomLevel - 2)))
+    // 축소할수록 선을 얇게 그려 전체 일정을 볼 때 선끼리 뭉치지 않게 한다. 단 3px 밑으로는 줄이지 않고
+    // 흰 테두리를 깔아서, 멀리 이동하는 일정을 한 화면에 넣어도 경로가 보이게 한다.
+    const weight = Math.max(3, Math.round(10 / 1.5 ** Math.max(0, zoomLevel - 2)))
     const segments = (routeSegments ?? []).filter((segment) => segment.path.length >= 2)
     // 같은 도로를 지나는 구간끼리 겹치면 화면상 평행하게 벌려서 그린다 (픽셀 단위라 줌과 상관없이 일정 간격)
     const projection = map.getProjection()
@@ -199,7 +249,8 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
         return { x: pt.x, y: pt.y }
       }),
     )
-    const gap = Math.max(4, weight + 3)
+    // 흰 테두리(양쪽 1.5px)까지 포함해 나란한 선이 서로 덮지 않을 만큼 벌린다
+    const gap = weight + 4
     const lanes = assignLanes(pixelPaths, Math.max(gap, 8))
     weightRef.current = weight
     const total = segments.length
@@ -208,6 +259,13 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
       const path = offsetPath(pixelPaths[index], laneToSide(lanes[index]) * gap).map((pt) =>
         projection.coordsFromContainerPoint(new window.kakao.maps.Point(pt.x, pt.y)),
       )
+      const casing = new window.kakao.maps.Polyline({
+        path,
+        strokeColor: '#ffffff',
+        strokeStyle: 'solid',
+        ...casingStyle(index, total, highlightRef.current, weight),
+      })
+      casing.setMap(map)
       const lines = splitByDash(path, segment.dashed ?? false, segment.dashedRanges).map((piece) => {
         const line = new window.kakao.maps.Polyline({
           path: piece.path,
@@ -226,13 +284,13 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
         strokeWeight: Math.max(10, weight),
         strokeColor: '#000000',
         strokeOpacity: 0.01,
-        zIndex: 1000 + (total - index),
+        zIndex: 2000 + (total - index),
       })
       window.kakao.maps.event.addListener(hit, 'mouseover', () => onSegmentHoverRef.current?.(index))
       window.kakao.maps.event.addListener(hit, 'mouseout', () => onSegmentHoverRef.current?.(null))
       hit.setMap(map)
-      created.push(...lines, hit)
-      return lines
+      created.push(casing, ...lines, hit)
+      return { lines, casings: [casing] }
     })
     polylinesRef.current = created
   }, [routeSegments, zoomLevel])
@@ -241,14 +299,24 @@ export function MapView({ markers, routeSegments, highlightedSegment, onSegmentH
   useEffect(() => {
     highlightRef.current = highlightedSegment ?? null
     const total = visibleLinesRef.current.length
-    visibleLinesRef.current.forEach((lines, index) =>
-      lines.forEach((line) => line.setOptions(lineStyle(index, total, highlightRef.current, weightRef.current))),
-    )
+    visibleLinesRef.current.forEach(({ lines, casings }, index) => {
+      lines.forEach((line) => line.setOptions(lineStyle(index, total, highlightRef.current, weightRef.current)))
+      casings.forEach((casing) => casing.setOptions(casingStyle(index, total, highlightRef.current, weightRef.current)))
+    })
   }, [highlightedSegment])
 
   if (error) {
     return <div className={className}>지도를 불러오지 못했습니다: {error}</div>
   }
 
-  return <div ref={containerRef} className={className} style={{ width: '100%', height: '100%' }} />
+  return (
+    <div className={className} style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      {markers.length > 1 && (
+        <button type="button" className="map-fit-button" onClick={fitToAll}>
+          한눈에 보기
+        </button>
+      )}
+    </div>
+  )
 }

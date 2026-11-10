@@ -13,7 +13,7 @@ import { useDayRoutes } from '@/hooks/useDayRoutes'
 import { DEFAULT_MAP_CENTER, TRAVEL_MODE_COLOR, TRAVEL_MODE_LABEL, TRAVEL_MODES } from '@/lib/constants'
 import { durationLabel, formatMonthDay, addDays, tripDayNumbers } from '@/lib/date'
 import { formatDuration, formatDistance } from '@/lib/format'
-import { useIsMobile } from '@/lib/viewport'
+import { mapFitPadding, useIsMobile } from '@/lib/viewport'
 import { useTripStore } from '@/store/tripStore'
 import type { PlaceSearchResult } from '@/types/place'
 import type { LatLng } from '@/types/route'
@@ -307,6 +307,8 @@ export function TripEditPage() {
       panTo={panTarget}
       center={mapCenter}
       onCenterChanged={setMapCenter}
+      fitKey={selectedDay}
+      fitPadding={mapFitPadding({ isMobile, sidebarOpen, panelOpen })}
       className="map-view"
     />
   )

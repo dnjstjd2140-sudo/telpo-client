@@ -52,6 +52,29 @@ button {
   height: 100%;
 }
 
+/* 지도 위쪽 가운데. 왼쪽 검색 패널/오른쪽 일정 패널/폰의 아래 시트 어디에도 가리지 않는 자리 */
+.map-fit-button {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.map-fit-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .map-marker-badge {
   display: flex;
   align-items: center;
