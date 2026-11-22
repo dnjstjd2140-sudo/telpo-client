@@ -554,6 +554,59 @@ button {
   cursor: pointer;
 }
 
+/* 정류지 행 오른쪽 버튼 묶음 (날짜 이동 / 삭제). 장소 이름 자리를 덜 먹도록 위아래로 쌓는다. */
+.stop-actions {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.trip-stop-row .stop-actions button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.trip-stop-row .stop-actions button.active {
+  border-color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* "날짜 이동"을 누르면 행 아래에 펼쳐지는 Day 선택지 */
+.day-move-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0 26px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.day-move-label {
+  width: 100%;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.day-move-btn,
+.day-move-cancel {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.day-move-cancel {
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
 .stop-memo {
   box-sizing: border-box;
   width: calc(100% - 26px);
@@ -973,6 +1026,16 @@ button {
   .place-search-results button,
   .trip-stop-row button {
     padding: 8px 12px;
+  }
+
+  .trip-stop-row .stop-actions button {
+    padding: 5px 10px;
+  }
+
+  .day-move-btn,
+  .day-move-cancel {
+    padding: 8px 12px;
+    font-size: 13px;
   }
 
   .order-buttons button {

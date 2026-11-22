@@ -18,6 +18,8 @@ interface TripState {
   removeStop: (stop: TripStop) => void
   /** 같은 날짜 안에서 stop을 toIndex(0부터) 위치로 옮기고 orderNo를 다시 매긴다. */
   moveStop: (stop: TripStop, toIndex: number) => void
+  /** stop을 다른 날짜(toDayNo)의 맨 끝으로 옮긴다. 메모 등 나머지 값은 그대로 두고, 두 날짜의 orderNo를 다시 매긴다. */
+  moveStopToDay: (stop: TripStop, toDayNo: number) => void
   setTravelMode: (stop: TripStop, mode: TravelMode) => void
   setMemo: (stop: TripStop, memo: string | null) => void
   markSaved: (trip: Trip) => void
@@ -52,6 +54,22 @@ export const useTripStore = create<TripState>((set) => ({
       reordered.splice(clampedTo, 0, stop)
 
       return { trip: { ...state.trip, stops: [...otherStops, ...renumber(reordered, stop.dayNo)] }, isDirty: true }
+    }),
+  moveStopToDay: (stop, toDayNo) =>
+    set((state) => {
+      if (!state.trip || stop.dayNo === toDayNo || !state.trip.stops.includes(stop)) return state
+      const fromDayNo = stop.dayNo
+      const byOrder = (a: TripStop, b: TripStop) => a.orderNo - b.orderNo
+      const fromStops = state.trip.stops.filter((s) => s.dayNo === fromDayNo && s !== stop).sort(byOrder)
+      const toStops = [...state.trip.stops.filter((s) => s.dayNo === toDayNo).sort(byOrder), { ...stop, dayNo: toDayNo }]
+      const otherStops = state.trip.stops.filter((s) => s.dayNo !== fromDayNo && s.dayNo !== toDayNo)
+      return {
+        trip: {
+          ...state.trip,
+          stops: [...otherStops, ...renumber(fromStops, fromDayNo), ...renumber(toStops, toDayNo)],
+        },
+        isDirty: true,
+      }
     }),
   setTravelMode: (stop, mode) =>
     set((state) =>

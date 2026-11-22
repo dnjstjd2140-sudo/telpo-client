@@ -27,6 +27,7 @@ export function TripEditPage() {
   const addStop = useTripStore((s) => s.addStop)
   const removeStop = useTripStore((s) => s.removeStop)
   const moveStop = useTripStore((s) => s.moveStop)
+  const moveStopToDay = useTripStore((s) => s.moveStopToDay)
   const setTravelMode = useTripStore((s) => s.setTravelMode)
   const setMemo = useTripStore((s) => s.setMemo)
   const markSaved = useTripStore((s) => s.markSaved)
@@ -46,6 +47,8 @@ export function TripEditPage() {
   const [panTarget, setPanTarget] = useState<LatLng | null>(null)
   const stopItemRefs = useRef<(HTMLLIElement | null)[]>([])
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
+  // "날짜 이동"을 눌러 Day 선택지를 펼친 정류지 (dayStops 기준 index)
+  const [dayPickerIndex, setDayPickerIndex] = useState<number | null>(null)
   useEffect(() => {
     if (!editToken) return
     getTripByEditToken(editToken).then((t) => {
@@ -115,11 +118,19 @@ export function TripEditPage() {
     if (currentIndex === -1) return
     moveStop(stop, currentIndex + direction)
     setSelectedIndex(currentIndex + direction)
+    setDayPickerIndex(null)
   }
 
   function handleReorder(stop: TripStop, toIndex: number) {
     moveStop(stop, toIndex)
     setSelectedIndex(toIndex)
+    setDayPickerIndex(null)
+  }
+
+  function handleMoveToDay(stop: TripStop, toDayNo: number) {
+    moveStopToDay(stop, toDayNo)
+    setDayPickerIndex(null)
+    setSelectedIndex(null)
   }
 
   function handleSelectStop(stop: TripStop, index: number, target: EventTarget) {
@@ -179,6 +190,7 @@ export function TripEditPage() {
           onClick={() => {
             setSelectedDay(day)
             setSelectedIndex(null)
+            setDayPickerIndex(null)
           }}
         >
           <span>Day {day}</span>
@@ -269,16 +281,51 @@ export function TripEditPage() {
                 </div>
                 {stop.address && <span title={stop.address}>{stop.address}</span>}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  removeStop(stop)
-                  setSelectedIndex(null)
-                }}
-              >
-                삭제
-              </button>
+              <div className="stop-actions">
+                {dayNumbers.length > 1 && (
+                  <button
+                    type="button"
+                    aria-expanded={dayPickerIndex === i}
+                    className={dayPickerIndex === i ? 'active' : undefined}
+                    onClick={() => setDayPickerIndex((cur) => (cur === i ? null : i))}
+                  >
+                    날짜 이동
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeStop(stop)
+                    setSelectedIndex(null)
+                    setDayPickerIndex(null)
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
             </div>
+            {dayPickerIndex === i && (
+              <div
+                className="day-move-picker"
+                role="group"
+                aria-label="옮길 날짜 선택"
+                // 폰에서는 목록이 짧은 시트 안에서 스크롤되므로, 펼친 선택지가 가려지지 않게 보이는 곳으로 끌어온다.
+                ref={(el) => el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })}
+              >
+                <span className="day-move-label">어느 날로 옮길까요?</span>
+                {dayNumbers
+                  .filter((day) => day !== selectedDay)
+                  .map((day) => (
+                    <button key={day} type="button" className="day-move-btn" onClick={() => handleMoveToDay(stop, day)}>
+                      Day {day}
+                      {trip.startDate && <span className="day-tab-date"> {formatMonthDay(addDays(trip.startDate, day - 1))}</span>}
+                    </button>
+                  ))}
+                <button type="button" className="day-move-cancel" onClick={() => setDayPickerIndex(null)}>
+                  취소
+                </button>
+              </div>
+            )}
             <StopMemo memo={stop.memo} onChange={(memo) => setMemo(stop, memo)} />
           </li>
         ))}
